@@ -2,6 +2,7 @@ import re
 import json
 from datetime import datetime
 from collections import defaultdict
+from fpdf import FPDF
 
 class RoadGuardProgram:
     def __init__(self, save_file="road_data.json"):
@@ -35,10 +36,10 @@ class RoadGuardProgram:
                 if msg_date == date:
                     messages.append({
                         "date": msg_date,
-                        "time": time,
-                        "reporter": reporter,
-                        "direction": direction,
-                        "car": car_desc
+                        "time": time[:5],
+                        "reporter": reporter[::-1],
+                        "direction": direction[::-1],
+                        "car": car_desc[::-1]
                     })
             else:
                 # If the message doesn't match, ask for correction
@@ -52,9 +53,9 @@ class RoadGuardProgram:
                             messages.append({
                                 "date": msg_date,
                                 "time": time,
-                                "reporter": reporter,
-                                "direction": direction,
-                                "car": car_desc
+                                "reporter": reporter[::-1],
+                                "direction": direction[::-1],
+                                "car": car_desc[::-1]
                             })
                     else:
                         print("Correction still does not match the expected format. Skipping...")
@@ -108,16 +109,54 @@ class RoadGuardProgram:
             for detail in details:
                 print(f"  - {detail['time']} | {detail['reporter']} | {detail['direction']}")
 
+    def save_output_to_pdf(self, file_name, chronological, car_summary, date):
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=5)
+        pdf.add_page()
+
+        # Use a Unicode-compatible font
+        pdf.add_font("FreeSans", "", "FreeSans.ttf", uni=True)
+        pdf.set_font("FreeSans", size=12)
+
+        # Add Title
+        pdf.set_font("FreeSans", size=8)
+        label = "דיווח תצפית מכוניות יומית"
+        pdf.cell(200, 10, txt=label[::-1], ln=True, align="C")
+        pdf.cell(200,7,txt = date, ln = True, align = "C")
+
+        # Add Chronological Table
+        pdf.set_font("FreeSans", size=8 )
+        pdf.ln(10)
+        for entry in chronological:
+            line = f"{entry['time']} | {entry['reporter']} | {entry['direction']} | {entry['car']}"
+            pdf.cell(200, 5, txt=line, ln=True)
+
+        # Add Car Summary Table
+        pdf.ln(5)
+        label = "תצפית לפי מכונית"
+        pdf.cell(200, 5, txt=label[::-1], ln=True, align="L")
+        for car, details in car_summary.items():
+            pdf.cell(200, 5, txt=f"{car}:", ln=True)
+            for detail in details:
+                line = f"  - {detail['time']} | {detail['reporter']} | {detail['direction']}"
+                pdf.cell(200, 5, txt=line, ln=True)
+
+        # Save to file
+        pdf.output(file_name)
+        print(f"PDF saved as: {file_name}")
+
+
 # Usage example:
 if __name__ == "__main__":
     program = RoadGuardProgram()
 
     # Input chat file and date
     chat_file = "whatsapp_chat.txt"  # Replace with your file
-    date = "10.6.2024"  # Replace with the desired date
+    date = "11.6.2024"  # Replace with the desired date
 
     # Process the chat file for the given date
     chronological, car_summary = program.process_chat(chat_file, date)
 
-    # Print tables
+    # Print tables and save to PDF
     program.print_tables(chronological, car_summary)
+    program.save_output_to_pdf("road_guard_report.pdf", chronological, car_summary,date)
