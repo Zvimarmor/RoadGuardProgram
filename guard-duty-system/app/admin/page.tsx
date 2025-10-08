@@ -1,0 +1,318 @@
+'use client';
+
+import { useState } from 'react';
+
+export default function Admin() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  // Period creation state
+  const [periodName, setPeriodName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [shiftLength, setShiftLength] = useState('2');
+  const [guardsText, setGuardsText] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Guard management state
+  const [guardName, setGuardName] = useState('');
+  const [guardRank, setGuardRank] = useState('');
+  const [periodId, setPeriodId] = useState('');
+
+  // Activity state
+  const [activityName, setActivityName] = useState('');
+  const [activityStart, setActivityStart] = useState('');
+  const [activityEnd, setActivityEnd] = useState('');
+  const [activityGuards, setActivityGuards] = useState<string[]>([]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username === 'admin' && password === 'admin') {
+      setIsAuthenticated(true);
+    } else {
+      alert('שם משתמש או סיסמה שגויים');
+    }
+  };
+
+  const handleCreatePeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
+
+    const guards = guardsText
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const parts = line.trim().split(' ');
+        // If only one word, treat it as the name with empty rank
+        if (parts.length === 1) {
+          return { rank: '', name: parts[0] };
+        }
+        // Otherwise, first word is rank, rest is name
+        const rank = parts[0];
+        const name = parts.slice(1).join(' ');
+        return { rank, name };
+      });
+
+    // Round dates to the nearest hour
+    const roundToHour = (dateString: string) => {
+      const date = new Date(dateString);
+      date.setMinutes(0, 0, 0);
+      return date.toISOString();
+    };
+
+    const payload = {
+      name: periodName,
+      startDate: roundToHour(startDate),
+      endDate: roundToHour(endDate),
+      shiftLength: parseFloat(shiftLength),
+      guards
+    };
+
+    try {
+      const res = await fetch('/api/periods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert('תקופה נוצרה בהצלחה!');
+        setActiveModal(null);
+        setPeriodName('');
+        setStartDate('');
+        setEndDate('');
+        setGuardsText('');
+      } else {
+        alert('שגיאה ביצירת תקופה');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('שגיאה ביצירת תקופה');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl shadow-black/5 dark:shadow-black/20 p-10 border border-neutral-200 dark:border-neutral-800">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold mb-2">כניסת אדמין</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">הזן פרטי התחברות</p>
+            </div>
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-neutral-700 dark:text-neutral-300">
+                  שם משתמש
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                  placeholder="הזן שם משתמש"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-neutral-700 dark:text-neutral-300">
+                  סיסמה
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                  placeholder="הזן סיסמה"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 py-3.5 rounded-xl font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.98] shadow-lg shadow-neutral-900/10 dark:shadow-neutral-100/10"
+              >
+                התחבר
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6 sm:p-8 lg:p-12">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-4xl font-bold mb-2 tracking-tight">פאנל ניהול</h1>
+            <p className="text-neutral-600 dark:text-neutral-400">ניהול תקופות, שומרים ופעילויות</p>
+          </div>
+          <button
+            onClick={() => setIsAuthenticated(false)}
+            className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded-lg"
+          >
+            התנתק
+          </button>
+        </div>
+
+        <div className="grid gap-5">
+          <button
+            onClick={() => setActiveModal('createPeriod')}
+            className="group bg-white dark:bg-neutral-900 p-8 rounded-2xl shadow-sm shadow-black/5 dark:shadow-black/20 border border-neutral-200 dark:border-neutral-800 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all text-right"
+          >
+            <h2 className="text-xl font-bold mb-2 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">צור תקופת שמירה חדשה</h2>
+            <p className="text-neutral-600 dark:text-neutral-400 text-[15px] leading-relaxed">
+              הגדר תקופה חדשה, הוסף שומרים וצור לוח זמנים אוטומטי
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveModal('addGuard')}
+            className="group bg-white dark:bg-neutral-900 p-8 rounded-2xl shadow-sm shadow-black/5 dark:shadow-black/20 border border-neutral-200 dark:border-neutral-800 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all text-right"
+          >
+            <h2 className="text-xl font-bold mb-2 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">הוסף / הסר שומר</h2>
+            <p className="text-neutral-600 dark:text-neutral-400 text-[15px] leading-relaxed">
+              ניהול שומרים באמצע תקופה - המערכת תאזן את השמירות אוטומטית
+            </p>
+          </button>
+
+          <button
+            onClick={() => setActiveModal('createActivity')}
+            className="group bg-white dark:bg-neutral-900 p-8 rounded-2xl shadow-sm shadow-black/5 dark:shadow-black/20 border border-neutral-200 dark:border-neutral-800 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all text-right"
+          >
+            <h2 className="text-xl font-bold mb-2 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">התחל תקופת השהייה (פעילות מיוחדת)</h2>
+            <p className="text-neutral-600 dark:text-neutral-400 text-[15px] leading-relaxed">
+              הגדר פעילות מיוחדת שמשהה את לוח השמירות הרגיל
+            </p>
+          </button>
+        </div>
+
+        {/* Create Period Modal */}
+        {activeModal === 'createPeriod' && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setActiveModal(null)}>
+            <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200 dark:border-neutral-800" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-3xl font-bold mb-2">צור תקופת שמירה חדשה</h2>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-8">מלא את הפרטים ליצירת תקופה אוטומטית</p>
+              <form onSubmit={handleCreatePeriod} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold mb-2.5">שם התקופה</label>
+                  <input
+                    type="text"
+                    value={periodName}
+                    onChange={(e) => setPeriodName(e.target.value)}
+                    placeholder="לדוגמה: שבוע 1 - ינואר 2024"
+                    className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2.5">תאריך התחלה</label>
+                    <input
+                      type="datetime-local"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2.5">תאריך סיום</label>
+                    <input
+                      type="datetime-local"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2.5">אורך משמרת (שעות)</label>
+                  <select
+                    value={shiftLength}
+                    onChange={(e) => setShiftLength(e.target.value)}
+                    className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
+                  >
+                    <option value="1.5">1.5 שעות</option>
+                    <option value="2">2 שעות</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2.5">שומרים (שורה אחת לכל שומר: דרגה שם)</label>
+                  <textarea
+                    value={guardsText}
+                    onChange={(e) => setGuardsText(e.target.value)}
+                    rows={8}
+                    placeholder="טוראי יוסי כהן&#10;רבטוראי דני לוי&#10;סמל שרה אברהם"
+                    className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none font-mono text-sm resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={isCreating}
+                    className="flex-1 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 py-3.5 rounded-xl font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    {isCreating ? 'יוצר...' : 'צור תקופה'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal(null)}
+                    className="flex-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 py-3.5 rounded-xl font-semibold hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-[0.98]"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Other modals can be added similarly */}
+        {activeModal === 'addGuard' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full">
+              <h2 className="text-2xl font-bold mb-6">הוסף / הסר שומר</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                פונקציונליות זו תבוצע בקרוב...
+              </p>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="w-full bg-gray-200 dark:bg-gray-700 py-3 rounded-xl font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeModal === 'createActivity' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full">
+              <h2 className="text-2xl font-bold mb-6">פעילות מיוחדת</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                פונקציונליות זו תבוצע בקרוב...
+              </p>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="w-full bg-gray-200 dark:bg-gray-700 py-3 rounded-xl font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

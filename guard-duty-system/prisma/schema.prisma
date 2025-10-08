@@ -1,0 +1,106 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Represents a guard rotation period (e.g., weekly)
+model GuardPeriod {
+  id            String    @id @default(cuid())
+  name          String    // e.g., "Week 1 - January 2024"
+  startDate     DateTime
+  endDate       DateTime
+  shiftLength   Float     // in hours (1.5 or 2)
+
+  guards        Guard[]
+  shifts        Shift[]
+  activities    ActivitySession[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Represents a guard within a specific period
+model Guard {
+  id            String    @id @default(cuid())
+  name          String
+  rank          String?   // Optional: e.g., "Private", "Corporal"
+  totalHours    Float     @default(0) // Hours served in this period
+  isActive      Boolean   @default(true)
+  joinedAt      DateTime  @default(now()) // When they joined this period
+
+  periodId      String
+  period        GuardPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  shifts        Shift[]
+  activityShifts ActivityShift[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([periodId, name]) // Each guard name is unique within a period
+}
+
+// Post types enum - using String for SQLite compatibility
+model Shift {
+  id            String    @id @default(cuid())
+  startTime     DateTime
+  endTime       DateTime
+  postType      String    // "Gate", "North", "West"
+  shiftType     String    // "day" or "night"
+  isSpecial     Boolean   @default(false) // true for morning readiness shifts
+  specialType   String?   // "morning_readiness" or null
+  peopleCount   Int       @default(1) // 1 for day shifts, 2 for night shifts
+
+  periodId      String
+  period        GuardPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  guardId       String?
+  guard         Guard?    @relation(fields: [guardId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([periodId, startTime])
+}
+
+// Special activity session that pauses normal scheduling
+model ActivitySession {
+  id            String    @id @default(cuid())
+  name          String
+  startTime     DateTime
+  endTime       DateTime
+  description   String?
+
+  periodId      String
+  period        GuardPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  activityShifts ActivityShift[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Shifts during an activity (separate from main shifts, don't affect total_hours)
+model ActivityShift {
+  id            String    @id @default(cuid())
+  startTime     DateTime
+  endTime       DateTime
+  postType      String    // "Gate", "North", "West" or activity-specific
+
+  activityId    String
+  activity      ActivitySession @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  guardId       String
+  guard         Guard     @relation(fields: [guardId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([activityId, startTime])
+}
