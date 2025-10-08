@@ -307,9 +307,6 @@ export default function Admin() {
                 התחבר
               </button>
             </form>
-            <p className="text-xs text-neutral-400 dark:text-neutral-600 mt-6 text-center">
-              ברירת מחדל: <span className="font-mono">admin / admin</span>
-            </p>
           </div>
         </div>
       </div>

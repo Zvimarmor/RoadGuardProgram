@@ -235,6 +235,7 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
 
   let currentDate = new Date(period.startDate);
   const endDate = new Date(period.endDate);
+  let previousDayGuards: string[] = []; // Track guards from previous day
 
   while (currentDate <= endDate) {
     // Get UTC date parts to avoid timezone confusion
@@ -277,11 +278,22 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
     });
 
     // Fill remaining slots with guards with lowest total hours
+    // Exclude guards who were in morning readiness yesterday
     while (selectedGuardIds.length < 9) {
-      const guardId = await getNextAvailableGuard(periodId, selectedGuardIds);
-      if (!guardId) break;
-      selectedGuardIds.push(guardId);
+      const excludeIds = [...selectedGuardIds, ...previousDayGuards];
+      const guardId = await getNextAvailableGuard(periodId, excludeIds);
+      if (!guardId) {
+        // If we can't find enough guards without repeats, allow previous day guards
+        const guardIdWithRepeat = await getNextAvailableGuard(periodId, selectedGuardIds);
+        if (!guardIdWithRepeat) break;
+        selectedGuardIds.push(guardIdWithRepeat);
+      } else {
+        selectedGuardIds.push(guardId);
+      }
     }
+
+    // Store today's guards for next iteration
+    previousDayGuards = [...selectedGuardIds];
 
     // Create morning readiness shift (does NOT count toward totalHours)
     for (const guardId of selectedGuardIds) {
