@@ -105,8 +105,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(completePeriod, { status: 201 });
   } catch (error) {
     console.error('Error creating period:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     return NextResponse.json(
-      { error: 'Failed to create period' },
+      { error: 'Failed to create period', details: errorMessage },
       { status: 500 }
     );
   }
