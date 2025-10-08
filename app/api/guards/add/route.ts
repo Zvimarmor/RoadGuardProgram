@@ -19,8 +19,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ guardId, message: 'Guard added successfully' });
   } catch (error) {
     console.error('Error adding guard:', error);
+
+    // Check if it's a unique constraint error
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A guard with this name already exists in this period' },
+        { status: 409 }
+      );
+    }
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to add guard' },
+      { error: 'Failed to add guard', details: errorMessage },
       { status: 500 }
     );
   }
