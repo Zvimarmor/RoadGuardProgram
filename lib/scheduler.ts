@@ -237,15 +237,20 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
   const endDate = new Date(period.endDate);
 
   while (currentDate <= endDate) {
-    // Create a clean date at midnight for the current day
-    const cleanDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-    const morningStartTime = setMinutes(setHours(cleanDate, 5), 30); // 05:30
-    const morningEndTime = setMinutes(setHours(cleanDate, 11), 0);   // 11:00
+    // Create date with specific time using UTC to avoid timezone issues
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const day = currentDate.getDate();
+
+    // Create times in local timezone by setting hours/minutes directly on Date constructor
+    const morningStartTime = new Date(year, month, day, 5, 30, 0, 0); // 05:30
+    const morningEndTime = new Date(year, month, day, 11, 0, 0, 0);   // 11:00
 
     console.log('Generating morning readiness:', {
-      date: cleanDate.toISOString(),
       startTime: morningStartTime.toISOString(),
-      endTime: morningEndTime.toISOString()
+      endTime: morningEndTime.toISOString(),
+      localStart: morningStartTime.toLocaleString('he-IL'),
+      localEnd: morningEndTime.toLocaleString('he-IL')
     });
 
     // Find guards on duty around 05:30 (between 04:00 and 06:00)

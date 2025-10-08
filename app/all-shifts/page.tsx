@@ -176,22 +176,22 @@ export default function AllShifts() {
                         index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-850'
                       }`}
                     >
-                      <td className="px-6 py-4 font-medium">
+                      <td className="px-3 sm:px-6 py-4 font-medium whitespace-nowrap">
                         {shift.guard ? `${shift.guard.rank || ''} ${shift.guard.name}` : '—'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         {format(new Date(shift.startTime), 'd MMMM', { locale: he })}
                       </td>
-                      <td className="px-6 py-4 font-mono">
+                      <td className="px-3 sm:px-6 py-4 font-mono whitespace-nowrap">
                         {format(new Date(shift.startTime), 'HH:mm')}
                       </td>
-                      <td className="px-6 py-4 font-mono">
+                      <td className="px-3 sm:px-6 py-4 font-mono whitespace-nowrap">
                         {format(new Date(shift.endTime), 'HH:mm')}
                       </td>
-                      <td className="px-6 py-4 font-semibold">
+                      <td className="px-3 sm:px-6 py-4 font-semibold whitespace-nowrap">
                         {translatePost(shift.postType)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <span className={`inline-block px-3 py-1 rounded-full text-sm ${
                           shift.isSpecial
                             ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
