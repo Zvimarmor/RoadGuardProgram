@@ -428,6 +428,37 @@ export async function regenerateShiftsFromTime(
 
   if (!period) throw new Error('Period not found');
 
+  // First, delete all existing future shifts (both assigned and unassigned)
+  const futureShifts = await prisma.shift.findMany({
+    where: {
+      periodId,
+      startTime: { gte: fromTime },
+      isSpecial: false
+    }
+  });
+
+  // Reset guard hours for deleted shifts
+  for (const shift of futureShifts) {
+    if (shift.guardId) {
+      const shiftDuration = (shift.endTime.getTime() - shift.startTime.getTime()) / (1000 * 60 * 60);
+      await prisma.guard.update({
+        where: { id: shift.guardId },
+        data: {
+          totalHours: { decrement: shiftDuration }
+        }
+      });
+    }
+  }
+
+  // Delete all future shifts
+  await prisma.shift.deleteMany({
+    where: {
+      periodId,
+      startTime: { gte: fromTime },
+      isSpecial: false
+    }
+  });
+
   interface ShiftInput {
     startTime: Date;
     endTime: Date;
