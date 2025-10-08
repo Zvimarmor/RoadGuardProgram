@@ -71,7 +71,7 @@ export default function Admin() {
         const activitiesRes = await fetch(`/api/periods/${period.id}/activities`);
         if (activitiesRes.ok) {
           const activities = await activitiesRes.json();
-          setActiveActivities(activities.filter((a: any) => a.isActive));
+          setActiveActivities(activities.filter((a: any) => a.endTime === null));
         }
       }
     } catch (error) {

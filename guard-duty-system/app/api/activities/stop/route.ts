@@ -22,12 +22,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update activity with endTime and set isActive to false
+    // Update activity with endTime
     await prisma.activitySession.update({
       where: { id: activityId },
       data: {
-        endTime: now,
-        isActive: false
+        endTime: now
       }
     });
 

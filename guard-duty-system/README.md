@@ -1,111 +1,36 @@
-# מערכת ניהול שמירות 🛡️
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-מערכת מתקדמת לניהול משמרות שמירה בבסיס צבאי, עם ממשק בעברית (RTL) ועיצוב מינימליסטי בשחור-לבן-אפור.
+## Getting Started
 
-## תכונות עיקריות
-
-### 📋 ניהול תקופות שמירה
-- יצירת תקופות שמירה עם תאריכי התחלה וסיום
-- בחירת אורך משמרת (1.5 או 2 שעות)
-- הוספת שומרים לתקופה
-- יצירה אוטומטית של לוח משמרות מלא
-
-### 🕐 משמרות חכמות
-- **משמרות יום (09:00-19:00)**: 3 עמדות (ש״ג, צפונית, מערבית) - שומר אחד בכל עמדה
-- **משמרות לילה (19:00-09:00)**: 2 עמדות (ש״ג, צפונית) - שני שומרים בכל עמדה
-- **כוננות בוקר (05:30)**: 9 שומרים ער לכוננות בוקר, עם עדיפות לשומרים שהיו בשמירה באותה שעה
-
-### ⚖️ איזון אוטומטי
-- מעקב אחר שעות שמירה של כל שומר
-- הקצאת משמרות לפי עקרון "מי שיש לו הכי פחות שעות"
-- איזון הדרגתי - ההפרשים בין השומרים נשמרים מינימליים
-
-### 👥 ניהול דינמי של כוח אדם
-- **הוספת שומר באמצע תקופה**:
-  - השומר החדש מתחיל עם 0 שעות
-  - המערכת מאזנת מחדש רק משמרות עתידיות
-  - השומר מקבל בהדרגה יותר משמרות עד שמגיע לממוצע הקבוצה
-
-- **הסרת שומר**:
-  - סימון השומר כלא פעיל
-  - ביטול משמרותיו העתידיות
-  - חלוקה מחדש של המשמרות בין השומרים הנותרים
-
-### 🎯 פעילויות מיוחדות (ActivitySession)
-- הגדרת פעילות עם זמן התחלה וסיום
-- בחירת שומרים ספציפיים לפעילות
-- השמירות הרגילות "מושהות" במהלך הפעילות
-- שעות הפעילות **לא משפיעות** על ספירת total_hours הרגילה
-- כשהפעילות מסתיימת, הלוח חוזר למצב רגיל
-
-## טכנולוגיות
-
-- **Next.js 15** (React 19 + Node.js)
-- **TypeScript** - קוד מאובטח וקריא
-- **Prisma** - ORM מודרני עם SQLite
-- **Tailwind CSS** - עיצוב מינימליסטי RTL
-- **date-fns** - ניהול תאריכים ושעות
-
-## התקנה והרצה
+First, run the development server:
 
 ```bash
-# התקנת חבילות
-npm install
-
-# הרצת migrations
-npx prisma migrate dev
-
-# הפעלת שרת פיתוח
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-הגש לכתובת: http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## שימוש
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-### 1. יצירת תקופת שמירה
-1. היכנס לעמוד **אדמין** (סיסמה: admin/admin)
-2. לחץ על "צור תקופת שמירה חדשה"
-3. מלא את הפרטים:
-   - שם התקופה (לדוגמה: "שבוע 1 - ינואר 2024")
-   - תאריך התחלה וסיום
-   - אורך משמרת (1.5 או 2 שעות)
-   - רשימת שומרים (דרגה + שם בכל שורה)
-4. לחץ "צור תקופה" - המערכת תייצר אוטומטית את כל המשמרות
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-### 2. צפייה במשמרות
-- **עמוד הבית**: מציג את המשמרת הנוכחית והבאה
-- **השמירות שלי**: בחר שומר וראה את כל המשמרות שלו
-- **כל השמירות**: טבלה מלאה עם אפשרות סינון
+## Learn More
 
-## עיצוב UI
+To learn more about Next.js, take a look at the following resources:
 
-- **שפה**: עברית בלבד, RTL
-- **צבעים**: שחור, לבן, אפור בלבד (מונוכרום)
-- **פונט**: Assistant - ידידותי לעברית
-- **עיצוב**: מינימליסטי, פינות מעוגלות, צללים עדינים
-- **רספונסיבי**: עובד בדסקטופ ומובייל
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## מבנה הפרויקט
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-```
-guard-duty-system/
-├── app/
-│   ├── page.tsx              # עמוד הבית
-│   ├── my-shifts/            # השמירות שלי
-│   ├── all-shifts/           # כל השמירות
-│   ├── admin/                # פאנל ניהול
-│   └── api/                  # API Routes
-├── components/               # רכיבי React
-├── lib/
-│   ├── prisma.ts            # Prisma Client
-│   └── scheduler.ts         # אלגוריתם התזמון
-└── prisma/
-    └── schema.prisma        # מבנה הנתונים
-```
+## Deploy on Vercel
 
----
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-**נוצר עבור**: ניהול משמרות שמירה בבסיס צבאי
-**גרסה**: 1.0.0
-**תאריך**: אוקטובר 2025
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

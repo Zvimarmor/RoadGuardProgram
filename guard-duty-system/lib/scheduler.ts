@@ -77,9 +77,10 @@ export async function generateShiftsForPeriod(periodId: string): Promise<void> {
 
     // Check if we're in an activity session (skip normal shift generation)
     const isInActivity = period.activities.some(activity =>
+      activity.endTime === null && // Activity is still running
       isWithinInterval(currentTime, {
         start: new Date(activity.startTime),
-        end: new Date(activity.endTime)
+        end: new Date() // Current time if activity is still running
       })
     );
 
@@ -428,9 +429,9 @@ export async function regenerateShiftsFromTime(
   while (currentTime < endTime) {
     const hour = currentTime.getHours();
 
-    // Check if we're in an active activity session (skip normal shift generation)
+    // Check if we're in an activity session (skip normal shift generation)
     const isInActivity = period.activities.some(activity =>
-      activity.isActive && new Date(activity.startTime) <= currentTime
+      new Date(activity.startTime) <= currentTime && currentTime < new Date(activity.endTime)
     );
 
     if (isInActivity) {

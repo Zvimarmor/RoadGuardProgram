@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
       if (uniqueGuards.length > 0) {
         const guardsToCreate = uniqueGuards.map((guard: any) => ({
           name: guard.name.trim(),
-          rank: guard.rank?.trim() || '',
           periodId: period.id,
           totalHours: 0
         }));
