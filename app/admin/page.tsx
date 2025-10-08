@@ -16,6 +16,13 @@ interface Period {
   guards: Guard[];
 }
 
+interface Activity {
+  id: string;
+  name: string;
+  endTime: Date | null;
+  description?: string;
+}
+
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState('');
@@ -42,7 +49,7 @@ export default function Admin() {
   const [activityName, setActivityName] = useState('');
   const [activityDescription, setActivityDescription] = useState('');
   const [selectedActivityGuards, setSelectedActivityGuards] = useState<string[]>([]);
-  const [activeActivities, setActiveActivities] = useState<any[]>([]);
+  const [activeActivities, setActiveActivities] = useState<(Activity & { startTime?: Date })[]>([]);
 
   // Fetch current period and guards when modal opens
   useEffect(() => {
@@ -71,7 +78,7 @@ export default function Admin() {
         const activitiesRes = await fetch(`/api/periods/${period.id}/activities`);
         if (activitiesRes.ok) {
           const activities = await activitiesRes.json();
-          setActiveActivities(activities.filter((a: any) => a.endTime === null));
+          setActiveActivities(activities.filter((a: Activity & { startTime?: Date }) => a.endTime === null));
         }
       }
     } catch (error) {
@@ -337,9 +344,11 @@ export default function Admin() {
                     {activity.description && (
                       <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-1">{activity.description}</p>
                     )}
-                    <p className="text-sm text-neutral-500 mt-2">
-                      התחיל: {new Date(activity.startTime).toLocaleString('he-IL')}
-                    </p>
+                    {activity.startTime && (
+                      <p className="text-sm text-neutral-500 mt-2">
+                        התחיל: {new Date(activity.startTime).toLocaleString('he-IL')}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => handleStopActivity(activity.id)}

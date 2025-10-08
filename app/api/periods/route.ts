@@ -55,15 +55,19 @@ export async function POST(request: NextRequest) {
     if (guards && Array.isArray(guards)) {
       console.log('Received guards:', JSON.stringify(guards, null, 2));
 
-      const uniqueGuards = guards.filter((guard: any, index: number, self: any[]) =>
+      interface GuardInput {
+        name: string;
+      }
+
+      const uniqueGuards = (guards as GuardInput[]).filter((guard: GuardInput, index: number, self: GuardInput[]) =>
         guard.name && guard.name.trim() &&
-        index === self.findIndex((g: any) => g.name.trim() === guard.name.trim())
+        index === self.findIndex((g: GuardInput) => g.name.trim() === guard.name.trim())
       );
 
       console.log('Unique guards after filtering:', JSON.stringify(uniqueGuards, null, 2));
 
       if (uniqueGuards.length > 0) {
-        const guardsToCreate = uniqueGuards.map((guard: any) => ({
+        const guardsToCreate = uniqueGuards.map((guard: GuardInput) => ({
           name: guard.name.trim(),
           periodId: period.id,
           totalHours: 0

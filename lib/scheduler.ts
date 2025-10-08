@@ -58,7 +58,16 @@ export async function generateShiftsForPeriod(periodId: string): Promise<void> {
 
   if (!period) throw new Error('Period not found');
 
-  const shifts: any[] = [];
+  interface ShiftInput {
+    startTime: Date;
+    endTime: Date;
+    postType: string;
+    shiftType: 'day' | 'night';
+    peopleCount: number;
+    periodId: string;
+  }
+
+  const shifts: ShiftInput[] = [];
   let currentTime = new Date(period.startDate);
   const endTime = new Date(period.endDate);
   const shiftLengthHours = period.shiftLength;
@@ -124,7 +133,12 @@ export async function assignGuardsToShifts(
   startFrom?: Date
 ): Promise<void> {
   // Get all unassigned shifts (optionally from a specific time forward)
-  const whereClause: any = {
+  const whereClause: {
+    periodId: string;
+    guardId: null;
+    isSpecial: false;
+    startTime?: { gte: Date };
+  } = {
     periodId,
     guardId: null,
     isSpecial: false // Don't auto-assign special shifts
@@ -414,7 +428,16 @@ export async function regenerateShiftsFromTime(
 
   if (!period) throw new Error('Period not found');
 
-  const shifts: any[] = [];
+  interface ShiftInput {
+    startTime: Date;
+    endTime: Date;
+    postType: string;
+    shiftType: 'day' | 'night';
+    peopleCount: number;
+    periodId: string;
+  }
+
+  const shifts: ShiftInput[] = [];
   let currentTime = new Date(fromTime);
   const endTime = new Date(period.endDate);
   const shiftLengthHours = period.shiftLength;
