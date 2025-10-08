@@ -136,12 +136,10 @@ export default function MyShifts() {
                     </tr>
                   </thead>
                   <tbody>
-                    {shifts.map((shift, index) => (
+                    {shifts.map((shift) => (
                       <tr
                         key={shift.id}
-                        className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors ${
-                          index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-850'
-                        }`}
+                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
                       >
                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                           {format(new Date(shift.startTime), 'EEEE, d MMMM', { locale: he })}
