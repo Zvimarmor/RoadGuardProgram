@@ -27,14 +27,13 @@ const NIGHT_SHIFT_CONFIG: ShiftConfig = {
 
 /**
  * Gets the guard with the lowest total hours who is active
- * With randomization among guards with similar hours to break patterns
  */
 async function getNextAvailableGuard(
   periodId: string,
   excludeIds: string[] = []
 ): Promise<string | null> {
-  // Get all available guards sorted by hours
-  const guards = await prisma.guard.findMany({
+  // Get the guard with minimum hours
+  const guard = await prisma.guard.findFirst({
     where: {
       periodId,
       isActive: true,
@@ -45,15 +44,7 @@ async function getNextAvailableGuard(
     }
   });
 
-  if (guards.length === 0) return null;
-
-  // Get guards with the minimum hours (or within 0.5 hours of minimum)
-  const minHours = guards[0].totalHours;
-  const candidateGuards = guards.filter(g => g.totalHours <= minHours + 0.5);
-
-  // Randomly pick one from the candidates to break patterns
-  const randomIndex = Math.floor(Math.random() * candidateGuards.length);
-  return candidateGuards[randomIndex].id;
+  return guard?.id ?? null;
 }
 
 /**
