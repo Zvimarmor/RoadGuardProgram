@@ -8,14 +8,13 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
 
-    // Create the activity (without endTime, isActive = true by default)
+    // Create the activity (without endTime - null endTime means active)
     const activity = await prisma.activitySession.create({
       data: {
         name,
         startTime: now,
         description,
-        periodId,
-        isActive: true
+        periodId
       }
     });
 
