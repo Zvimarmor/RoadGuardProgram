@@ -242,11 +242,11 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
     const month = currentDate.getUTCMonth();
     const day = currentDate.getUTCDate();
 
-    // Create UTC date and then adjust for Israel timezone (UTC+2 in October)
-    // Israel is UTC+2 in October (standard time), UTC+3 in summer
-    // When we want 05:30 in Israel during standard time, we need 03:30 UTC
-    const morningStartTime = new Date(Date.UTC(year, month, day, 3, 30, 0, 0)); // 05:30 Israel time (UTC+2)
-    const morningEndTime = new Date(Date.UTC(year, month, day, 9, 0, 0, 0));   // 11:00 Israel time (UTC+2)
+    // Create UTC date and then adjust for Israel timezone
+    // Israel is UTC+3 (daylight time) - standard approach for most of the year
+    // When we want 05:30 in Israel, we need 02:30 UTC (05:30 - 3 = 02:30)
+    const morningStartTime = new Date(Date.UTC(year, month, day, 2, 30, 0, 0)); // 05:30 Israel time (UTC+3)
+    const morningEndTime = new Date(Date.UTC(year, month, day, 8, 0, 0, 0));   // 11:00 Israel time (UTC+3)
 
     console.log('Generating morning readiness:', {
       startTime: morningStartTime.toISOString(),
