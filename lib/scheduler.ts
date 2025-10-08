@@ -285,7 +285,8 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
  */
 export async function addGuardToPeriod(
   periodId: string,
-  name: string
+  name: string,
+  rank?: string
 ): Promise<string> {
   const now = new Date();
 
@@ -302,6 +303,7 @@ export async function addGuardToPeriod(
   const guard = await prisma.guard.create({
     data: {
       name,
+      rank: rank || '',
       totalHours: averageHours,
       periodId,
       joinedAt: now
@@ -422,7 +424,7 @@ export async function regenerateShiftsFromTime(
 
     // Check if we're in an activity session (skip normal shift generation)
     const isInActivity = period.activities.some(activity =>
-      new Date(activity.startTime) <= currentTime && currentTime < new Date(activity.endTime)
+      activity.endTime && new Date(activity.startTime) <= currentTime && currentTime < new Date(activity.endTime)
     );
 
     if (isInActivity) {
