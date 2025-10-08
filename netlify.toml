@@ -1,4 +1,15 @@
 [build]
-  base = "guard-duty-system"
+  command = "npm install && npm run build"
   publish = ".next"
-  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NODE_ENV = "production"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/next_server"
+  status = 200
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
