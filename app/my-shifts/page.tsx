@@ -119,7 +119,7 @@ export default function MyShifts() {
         </div>
 
         {selectedGuardId && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {shifts.length === 0 ? (
               <div className="p-12 text-center text-gray-500 dark:text-gray-500">
                 אין שמירות עתידיות

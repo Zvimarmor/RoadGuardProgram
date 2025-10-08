@@ -150,7 +150,7 @@ export default function AllShifts() {
         </div>
 
         {/* Shifts Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {filteredShifts.length === 0 ? (
             <div className="p-12 text-center text-gray-500 dark:text-gray-500">
               אין שמירות להצגה
@@ -172,9 +172,7 @@ export default function AllShifts() {
                   {filteredShifts.map((shift, index) => (
                     <tr
                       key={shift.id}
-                      className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors ${
-                        index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-850'
-                      }`}
+                      className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors bg-transparent"
                     >
                       <td className="px-3 sm:px-6 py-4 font-medium whitespace-nowrap">
                         {shift.guard ? `${shift.guard.rank || ''} ${shift.guard.name}` : '—'}
