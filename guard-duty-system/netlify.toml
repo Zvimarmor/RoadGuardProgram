@@ -7,12 +7,10 @@
   NODE_VERSION = "18"
   NODE_ENV = "production"
 
-# Ensure Next.js routing works correctly
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/next_server"
   status = 200
 
-# Handle Next.js rewrite rules
 [[plugins]]
   package = "@netlify/plugin-nextjs"
