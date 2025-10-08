@@ -237,20 +237,22 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
   const endDate = new Date(period.endDate);
 
   while (currentDate <= endDate) {
-    // Create date with specific time using UTC to avoid timezone issues
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const day = currentDate.getDate();
+    // Get UTC date parts to avoid timezone confusion
+    const year = currentDate.getUTCFullYear();
+    const month = currentDate.getUTCMonth();
+    const day = currentDate.getUTCDate();
 
-    // Create times in local timezone by setting hours/minutes directly on Date constructor
-    const morningStartTime = new Date(year, month, day, 5, 30, 0, 0); // 05:30
-    const morningEndTime = new Date(year, month, day, 11, 0, 0, 0);   // 11:00
+    // Create UTC date and then adjust for Israel timezone (UTC+2 in October)
+    // Israel is UTC+2 in October (standard time), UTC+3 in summer
+    // When we want 05:30 in Israel during standard time, we need 03:30 UTC
+    const morningStartTime = new Date(Date.UTC(year, month, day, 3, 30, 0, 0)); // 05:30 Israel time (UTC+2)
+    const morningEndTime = new Date(Date.UTC(year, month, day, 9, 0, 0, 0));   // 11:00 Israel time (UTC+2)
 
     console.log('Generating morning readiness:', {
       startTime: morningStartTime.toISOString(),
       endTime: morningEndTime.toISOString(),
-      localStart: morningStartTime.toLocaleString('he-IL'),
-      localEnd: morningEndTime.toLocaleString('he-IL')
+      israelStart: morningStartTime.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }),
+      israelEnd: morningEndTime.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })
     });
 
     // Find guards on duty around 05:30 (between 04:00 and 06:00)
