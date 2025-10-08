@@ -1,15 +1,9 @@
 [build]
-  command = "npm install && npm run build"
+  command = "npm run build"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
-  NODE_ENV = "production"
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/next_server"
-  status = 200
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
