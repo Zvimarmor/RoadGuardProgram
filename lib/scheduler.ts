@@ -242,6 +242,12 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
     const morningStartTime = setMinutes(setHours(cleanDate, 5), 30); // 05:30
     const morningEndTime = setMinutes(setHours(cleanDate, 11), 0);   // 11:00
 
+    console.log('Generating morning readiness:', {
+      date: cleanDate.toISOString(),
+      startTime: morningStartTime.toISOString(),
+      endTime: morningEndTime.toISOString()
+    });
+
     // Find guards on duty around 05:30 (between 04:00 and 06:00)
     const guardsOnDuty = await prisma.shift.findMany({
       where: {
