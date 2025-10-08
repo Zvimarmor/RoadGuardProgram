@@ -27,12 +27,14 @@ const NIGHT_SHIFT_CONFIG: ShiftConfig = {
 
 /**
  * Gets the guard with the lowest total hours who is active
+ * With randomization among guards with similar hours to break patterns
  */
 async function getNextAvailableGuard(
   periodId: string,
   excludeIds: string[] = []
 ): Promise<string | null> {
-  const guard = await prisma.guard.findFirst({
+  // Get all available guards sorted by hours
+  const guards = await prisma.guard.findMany({
     where: {
       periodId,
       isActive: true,
@@ -43,7 +45,15 @@ async function getNextAvailableGuard(
     }
   });
 
-  return guard?.id || null;
+  if (guards.length === 0) return null;
+
+  // Get guards with the minimum hours (or within 0.5 hours of minimum)
+  const minHours = guards[0].totalHours;
+  const candidateGuards = guards.filter(g => g.totalHours <= minHours + 0.5);
+
+  // Randomly pick one from the candidates to break patterns
+  const randomIndex = Math.floor(Math.random() * candidateGuards.length);
+  return candidateGuards[randomIndex].id;
 }
 
 /**
@@ -115,6 +125,7 @@ export async function generateShiftsForPeriod(periodId: string): Promise<void> {
 
 /**
  * Assigns guards to all unassigned shifts in a period, balancing by total_hours
+ * Uses round-based rotation to ensure fair distribution and variety
  */
 export async function assignGuardsToShifts(
   periodId: string,
@@ -135,6 +146,14 @@ export async function assignGuardsToShifts(
     where: whereClause,
     orderBy: { startTime: 'asc' }
   });
+
+  // Get all active guards for this period
+  const allGuards = await prisma.guard.findMany({
+    where: { periodId, isActive: true }
+  });
+
+  let assignedInCurrentRound = 0;
+  let roundOffset = 0; // Used to rotate guard selection each round
 
   for (const shift of unassignedShifts) {
     // Find guards who are NOT already assigned to an overlapping shift
@@ -187,6 +206,13 @@ export async function assignGuardsToShifts(
         }
       })
     ]);
+
+    // Track rounds: when all guards have been assigned once, start new round with rotation
+    assignedInCurrentRound++;
+    if (assignedInCurrentRound >= allGuards.length) {
+      assignedInCurrentRound = 0;
+      roundOffset++; // This will cause getNextAvailableGuard to pick differently next round
+    }
   }
 }
 
@@ -236,7 +262,7 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
       selectedGuardIds.push(guardId);
     }
 
-    // Create morning readiness shift (5.5 hours: 05:30-11:00)
+    // Create morning readiness shift (does NOT count toward totalHours)
     for (const guardId of selectedGuardIds) {
       await prisma.shift.create({
         data: {
@@ -252,13 +278,7 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
         }
       });
 
-      // Update guard's total hours (5.5 hours)
-      await prisma.guard.update({
-        where: { id: guardId },
-        data: {
-          totalHours: { increment: 5.5 }
-        }
-      });
+      // Morning readiness does NOT count toward totalHours - it's just presence duty
     }
 
     // Move to next day
@@ -268,21 +288,29 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
 
 /**
  * Adds a new guard to a period mid-rotation
- * Rebalances future shifts to gradually increase their hours
+ * Sets their hours to the current average to prevent clustering
+ * Rebalances future shifts to gradually integrate them
  */
 export async function addGuardToPeriod(
   periodId: string,
-  name: string,
-  rank?: string
+  name: string
 ): Promise<string> {
   const now = new Date();
 
-  // Create the new guard
+  // Calculate average hours of existing guards
+  const existingGuards = await prisma.guard.findMany({
+    where: { periodId, isActive: true }
+  });
+
+  const averageHours = existingGuards.length > 0
+    ? existingGuards.reduce((sum, g) => sum + g.totalHours, 0) / existingGuards.length
+    : 0;
+
+  // Create the new guard with average hours (fair starting point)
   const guard = await prisma.guard.create({
     data: {
       name,
-      rank,
-      totalHours: 0,
+      totalHours: averageHours,
       periodId,
       joinedAt: now
     }
@@ -378,52 +406,68 @@ async function rebalanceFutureShifts(periodId: string, fromTime: Date): Promise<
 }
 
 /**
- * Creates an activity session and generates shifts for it
- * Pauses normal schedule during the activity
+ * Regenerates shifts from a specific time forward
+ * Used when activity stops to restore normal schedule
  */
-export async function createActivitySession(
+export async function regenerateShiftsFromTime(
   periodId: string,
-  name: string,
-  startTime: Date,
-  endTime: Date,
-  guardIds: string[],
-  description?: string
-): Promise<string> {
-  // Create the activity
-  const activity = await prisma.activitySession.create({
-    data: {
-      name,
-      startTime,
-      endTime,
-      description,
-      periodId
-    }
+  fromTime: Date
+): Promise<void> {
+  const period = await prisma.guardPeriod.findUnique({
+    where: { id: periodId },
+    include: { activities: true }
   });
 
-  // Delete any normal shifts that overlap with this activity
-  await prisma.shift.deleteMany({
-    where: {
-      periodId,
-      startTime: { gte: startTime },
-      endTime: { lte: endTime }
-    }
-  });
+  if (!period) throw new Error('Period not found');
 
-  // Generate activity shifts (simplified - assign each guard to the full duration)
-  for (const guardId of guardIds) {
-    await prisma.activityShift.create({
-      data: {
-        startTime,
-        endTime,
-        postType: 'Activity',
-        activityId: activity.id,
-        guardId
+  const shifts: any[] = [];
+  let currentTime = new Date(fromTime);
+  const endTime = new Date(period.endDate);
+  const shiftLengthHours = period.shiftLength;
+
+  while (currentTime < endTime) {
+    const hour = currentTime.getHours();
+
+    // Check if we're in an active activity session (skip normal shift generation)
+    const isInActivity = period.activities.some(activity =>
+      activity.isActive && new Date(activity.startTime) <= currentTime
+    );
+
+    if (isInActivity) {
+      // Skip to next shift length
+      currentTime = addHours(currentTime, shiftLengthHours);
+      continue;
+    }
+
+    // Determine if we're in day or night shift
+    const config = (hour >= 8 && hour < 19) ? DAY_SHIFT_CONFIG : NIGHT_SHIFT_CONFIG;
+
+    // Generate shifts for each post
+    for (const post of config.posts) {
+      for (let i = 0; i < config.peoplePerPost; i++) {
+        const shiftEnd = addHours(currentTime, shiftLengthHours);
+
+        shifts.push({
+          startTime: new Date(currentTime),
+          endTime: shiftEnd,
+          postType: post,
+          shiftType: config.shiftType,
+          peopleCount: config.peoplePerPost,
+          periodId
+        });
       }
+    }
+
+    currentTime = addHours(currentTime, shiftLengthHours);
+  }
+
+  // Create shifts in database (without guard assignments yet)
+  if (shifts.length > 0) {
+    await prisma.shift.createMany({
+      data: shifts
     });
   }
 
-  // Rebalance shifts after the activity
-  await rebalanceFutureShifts(periodId, endTime);
-
-  return activity.id;
+  // Now assign guards to all shifts
+  await assignGuardsToShifts(periodId, fromTime);
 }

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 interface Guard {
   id: string;
   name: string;
-  
+  rank: string;
   totalHours: number;
   isActive: boolean;
 }
@@ -36,13 +36,15 @@ export default function Admin() {
 
   // Guard management state
   const [newGuardName, setNewGuardName] = useState('');
+  const [newGuardRank, setNewGuardRank] = useState('');
   const [selectedGuardId, setSelectedGuardId] = useState('');
 
   // Activity state
   const [activityName, setActivityName] = useState('');
+  const [activityStart, setActivityStart] = useState('');
+  const [activityEnd, setActivityEnd] = useState('');
   const [activityDescription, setActivityDescription] = useState('');
   const [selectedActivityGuards, setSelectedActivityGuards] = useState<string[]>([]);
-  const [activeActivities, setActiveActivities] = useState<any[]>([]);
 
   // Fetch current period and guards when modal opens
   useEffect(() => {
@@ -51,28 +53,13 @@ export default function Admin() {
     }
   }, [activeModal]);
 
-  // Fetch activities when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchCurrentPeriod();
-    }
-  }, [isAuthenticated]);
-
   const fetchCurrentPeriod = async () => {
     try {
       const res = await fetch('/api/periods');
       const periods = await res.json();
       if (periods.length > 0) {
-        const period = periods[0];
-        setCurrentPeriod(period);
-        setAllGuards(period.guards || []);
-
-        // Fetch active activities for this period
-        const activitiesRes = await fetch(`/api/periods/${period.id}/activities`);
-        if (activitiesRes.ok) {
-          const activities = await activitiesRes.json();
-          setActiveActivities(activities.filter((a: any) => a.isActive));
-        }
+        setCurrentPeriod(periods[0]);
+        setAllGuards(periods[0].guards || []);
       }
     } catch (error) {
       console.error('Error fetching period:', error);
@@ -96,7 +83,13 @@ export default function Admin() {
       .split('\n')
       .filter(line => line.trim())
       .map(line => {
-        return { name: line.trim() };
+        const parts = line.trim().split(' ');
+        if (parts.length === 1) {
+          return { rank: '', name: parts[0] };
+        }
+        const rank = parts[0];
+        const name = parts.slice(1).join(' ');
+        return { rank, name };
       });
 
     const roundToHalfHour = (dateString: string) => {
@@ -151,12 +144,14 @@ export default function Admin() {
         body: JSON.stringify({
           periodId: currentPeriod.id,
           name: newGuardName,
+          rank: newGuardRank
         })
       });
 
       if (res.ok) {
         alert('שומר נוסף בהצלחה!');
         setNewGuardName('');
+        setNewGuardRank('');
         fetchCurrentPeriod();
       } else {
         alert('שגיאה בהוספת שומר');
@@ -192,60 +187,49 @@ export default function Admin() {
     }
   };
 
-  const handleStartActivity = async (e: React.FormEvent) => {
+  const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPeriod || selectedActivityGuards.length === 0) {
       alert('יש לבחור לפחות שומר אחד');
       return;
     }
 
+    const roundToHalfHour = (dateString: string) => {
+      const date = new Date(dateString);
+      const minutes = date.getMinutes();
+      const roundedMinutes = minutes < 30 ? 0 : 30;
+      date.setMinutes(roundedMinutes, 0, 0);
+      return date.toISOString();
+    };
+
     try {
-      const res = await fetch('/api/activities/start', {
+      const res = await fetch('/api/activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           periodId: currentPeriod.id,
           name: activityName,
+          startTime: roundToHalfHour(activityStart),
+          endTime: roundToHalfHour(activityEnd),
           guardIds: selectedActivityGuards,
           description: activityDescription
         })
       });
 
       if (res.ok) {
-        alert('פעילות התחילה בהצלחה!');
+        alert('פעילות נוצרה בהצלחה!');
         setActivityName('');
+        setActivityStart('');
+        setActivityEnd('');
         setActivityDescription('');
         setSelectedActivityGuards([]);
         setActiveModal(null);
-        fetchCurrentPeriod();
       } else {
-        alert('שגיאה בהפעלת פעילות');
+        alert('שגיאה ביצירת פעילות');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('שגיאה בהפעלת פעילות');
-    }
-  };
-
-  const handleStopActivity = async (activityId: string) => {
-    if (!confirm('האם אתה בטוח שאתה רוצה לעצור את הפעילות?')) return;
-
-    try {
-      const res = await fetch('/api/activities/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activityId })
-      });
-
-      if (res.ok) {
-        alert('פעילות נעצרה בהצלחה! לוח משמרות רגיל חודש.');
-        fetchCurrentPeriod();
-      } else {
-        alert('שגיאה בעצירת פעילות');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('שגיאה בעצירת פעילות');
+      alert('שגיאה ביצירת פעילות');
     }
   };
 
@@ -324,34 +308,6 @@ export default function Admin() {
             התנתק
           </button>
         </div>
-
-        {/* Active Activities Section */}
-        {activeActivities.length > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-2xl p-6 mb-5">
-            <h2 className="text-xl font-bold mb-4 text-yellow-900 dark:text-yellow-200">🔴 פעילויות פעילות כעת</h2>
-            {activeActivities.map((activity) => (
-              <div key={activity.id} className="bg-white dark:bg-neutral-800 rounded-xl p-5 mb-3 last:mb-0">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-bold">{activity.name}</h3>
-                    {activity.description && (
-                      <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-1">{activity.description}</p>
-                    )}
-                    <p className="text-sm text-neutral-500 mt-2">
-                      התחיל: {new Date(activity.startTime).toLocaleString('he-IL')}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleStopActivity(activity.id)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    עצור פעילות
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         <div className="grid gap-5">
           <button
@@ -495,6 +451,16 @@ export default function Admin() {
                           required
                         />
                       </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">דרגה (אופציונלי)</label>
+                        <input
+                          type="text"
+                          value={newGuardRank}
+                          onChange={(e) => setNewGuardRank(e.target.value)}
+                          // placeholder="למשל: רס״ן"
+                          className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 outline-none"
+                        />
+                      </div>
                       <button
                         type="submit"
                         className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold"
@@ -516,7 +482,7 @@ export default function Admin() {
                         <option value="">בחר שומר להסרה</option>
                         {allGuards.filter(g => g.isActive).map(guard => (
                           <option key={guard.id} value={guard.id}>
-                            {guard.name} ({guard.totalHours.toFixed(1)} שעות)
+                            {guard.rank} {guard.name} ({guard.totalHours.toFixed(1)} שעות)
                           </option>
                         ))}
                       </select>
@@ -552,7 +518,7 @@ export default function Admin() {
               <p className="text-neutral-600 dark:text-neutral-400 mb-8">הגדר פעילות שמשהה את לוח השמירות הרגיל</p>
 
               {currentPeriod ? (
-                <form onSubmit={handleStartActivity} className="space-y-6">
+                <form onSubmit={handleCreateActivity} className="space-y-6">
                   <div>
                     <label className="block text-sm font-semibold mb-2.5">שם הפעילות</label>
                     <input
@@ -563,6 +529,29 @@ export default function Admin() {
                       className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 outline-none"
                       required
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2.5">זמן התחלה</label>
+                      <input
+                        type="datetime-local"
+                        value={activityStart}
+                        onChange={(e) => setActivityStart(e.target.value)}
+                        className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2.5">זמן סיום</label>
+                      <input
+                        type="datetime-local"
+                        value={activityEnd}
+                        onChange={(e) => setActivityEnd(e.target.value)}
+                        className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 outline-none"
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -587,7 +576,7 @@ export default function Admin() {
                             onChange={() => toggleActivityGuard(guard.id)}
                             className="w-4 h-4"
                           />
-                          <span>{guard.name}</span>
+                          <span>{guard.rank} {guard.name}</span>
                         </label>
                       ))}
                     </div>
@@ -599,7 +588,7 @@ export default function Admin() {
                       type="submit"
                       className="flex-1 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 py-3.5 rounded-xl font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-lg"
                     >
-                      התחל פעילות
+                      צור פעילות
                     </button>
                     <button
                       type="button"

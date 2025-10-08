@@ -29,7 +29,6 @@ model GuardPeriod {
 model Guard {
   id            String    @id @default(cuid())
   name          String
-  rank          String?   // Optional: e.g., "Private", "Corporal"
   totalHours    Float     @default(0) // Hours served in this period
   isActive      Boolean   @default(true)
   joinedAt      DateTime  @default(now()) // When they joined this period
@@ -74,8 +73,9 @@ model ActivitySession {
   id            String    @id @default(cuid())
   name          String
   startTime     DateTime
-  endTime       DateTime
+  endTime       DateTime?  // Optional - null means activity is still active
   description   String?
+  isActive      Boolean   @default(true) // true = running, false = stopped
 
   periodId      String
   period        GuardPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
