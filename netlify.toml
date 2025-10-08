@@ -1,0 +1,4 @@
+[build]
+  base = "guard-duty-system"
+  publish = ".next"
+  command = "npm run build"
