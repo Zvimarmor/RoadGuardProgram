@@ -234,7 +234,7 @@ export async function assignGuardsToShifts(
  * Generates morning readiness shifts at 05:30-11:00 each day
  * Preferably assigns guards who were on duty around that time
  */
-async function generateMorningReadinessShifts(periodId: string): Promise<void> {
+export async function generateMorningReadinessShifts(periodId: string): Promise<void> {
   const period = await prisma.guardPeriod.findUnique({
     where: { id: periodId }
   });
@@ -381,6 +381,9 @@ export async function addGuardToPeriod(
   // Rebalance future shifts (shifts after now)
   await rebalanceFutureShifts(periodId, now);
 
+  // Regenerate future morning readiness shifts to include new guard
+  await regenerateMorningReadiness(periodId, now);
+
   return guard.id;
 }
 
@@ -404,11 +407,15 @@ export async function removeGuardFromPeriod(guardId: string): Promise<void> {
 
   if (!guard) return;
 
-  // Get future shifts
+  // Get future shifts (including both regular and special shifts)
   const futureShifts = guard.shifts.filter(shift => new Date(shift.startTime) > now);
 
-  // Unassign future shifts
-  for (const shift of futureShifts) {
+  // Separate regular and special shifts
+  const regularShifts = futureShifts.filter(s => !s.isSpecial);
+  const specialShifts = futureShifts.filter(s => s.isSpecial);
+
+  // Unassign future regular shifts and decrement hours
+  for (const shift of regularShifts) {
     const shiftDuration = (shift.endTime.getTime() - shift.startTime.getTime()) / (1000 * 60 * 60);
 
     await prisma.$transaction([
@@ -425,8 +432,19 @@ export async function removeGuardFromPeriod(guardId: string): Promise<void> {
     ]);
   }
 
-  // Reassign those shifts
+  // Unassign special shifts (morning readiness) - don't decrement hours
+  for (const shift of specialShifts) {
+    await prisma.shift.update({
+      where: { id: shift.id },
+      data: { guardId: null }
+    });
+  }
+
+  // Reassign regular shifts
   await assignGuardsToShifts(guard.periodId, now);
+
+  // Regenerate future morning readiness shifts without the removed guard
+  await regenerateMorningReadiness(guard.periodId, now);
 }
 
 /**
@@ -572,4 +590,132 @@ export async function regenerateShiftsFromTime(
 
   // Now assign guards to all shifts
   await assignGuardsToShifts(periodId, fromTime);
+}
+
+/**
+ * Regenerates morning readiness shifts from a specific time forward
+ * Used when guards are added/removed to rebalance morning readiness assignments
+ */
+async function regenerateMorningReadiness(periodId: string, fromTime: Date): Promise<void> {
+  const period = await prisma.guardPeriod.findUnique({
+    where: { id: periodId }
+  });
+
+  if (!period) return;
+
+  // Delete all future morning readiness shifts
+  await prisma.shift.deleteMany({
+    where: {
+      periodId,
+      startTime: { gte: fromTime },
+      isSpecial: true,
+      specialType: 'morning_readiness'
+    }
+  });
+
+  // Regenerate morning readiness from fromTime until end of period
+  let currentDate = new Date(fromTime);
+  const endDate = new Date(period.endDate);
+
+  // Get the previous day's morning readiness guards (if any exist before fromTime)
+  const previousMorningReadiness = await prisma.shift.findMany({
+    where: {
+      periodId,
+      startTime: { lt: fromTime },
+      isSpecial: true,
+      specialType: 'morning_readiness'
+    },
+    orderBy: { startTime: 'desc' },
+    take: 9,
+    select: { guardId: true }
+  });
+
+  let previousDayGuards: string[] = previousMorningReadiness
+    .map(s => s.guardId)
+    .filter((id): id is string => id !== null);
+
+  // Round to start of day
+  currentDate.setHours(0, 0, 0, 0);
+
+  while (currentDate <= endDate) {
+    const year = currentDate.getUTCFullYear();
+    const month = currentDate.getUTCMonth();
+    const day = currentDate.getUTCDate();
+
+    const morningStartTime = new Date(Date.UTC(year, month, day, 2, 30, 0, 0));
+    const morningEndTime = new Date(Date.UTC(year, month, day, 8, 0, 0, 0));
+
+    // Skip if this morning readiness is in the past
+    if (morningStartTime < fromTime) {
+      currentDate = addHours(currentDate, 24);
+      continue;
+    }
+
+    // Exclude guards with shifts ending/starting within 4 hours before morning readiness
+    const minimumSleepTime = new Date(morningStartTime.getTime() - (4 * 60 * 60 * 1000));
+    const guardsToExclude = await prisma.shift.findMany({
+      where: {
+        periodId,
+        OR: [
+          { endTime: { gte: minimumSleepTime, lte: morningStartTime } },
+          { startTime: { gte: minimumSleepTime, lte: morningStartTime } }
+        ]
+      },
+      select: { guardId: true },
+      distinct: ['guardId']
+    });
+
+    const excludedGuardIds = guardsToExclude
+      .map(s => s.guardId)
+      .filter((id): id is string => id !== null);
+
+    const selectedGuardIds: string[] = [];
+
+    while (selectedGuardIds.length < 9) {
+      const excludeIds = [...selectedGuardIds, ...previousDayGuards, ...excludedGuardIds];
+      const guardId = await getNextAvailableGuard(periodId, excludeIds);
+
+      if (guardId) {
+        selectedGuardIds.push(guardId);
+      } else {
+        const excludeIdsRelaxed = [...selectedGuardIds, ...excludedGuardIds];
+        const guardIdWithRepeat = await getNextAvailableGuard(periodId, excludeIdsRelaxed);
+
+        if (guardIdWithRepeat) {
+          selectedGuardIds.push(guardIdWithRepeat);
+        } else {
+          const guardIdLastResort = await getNextAvailableGuard(periodId, [...selectedGuardIds, ...excludedGuardIds]);
+
+          if (guardIdLastResort) {
+            selectedGuardIds.push(guardIdLastResort);
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (selectedGuardIds.length >= 9) break;
+    }
+
+    previousDayGuards = [...selectedGuardIds];
+
+    // Create morning readiness shifts
+    for (const guardId of selectedGuardIds) {
+      await prisma.shift.create({
+        data: {
+          startTime: morningStartTime,
+          endTime: morningEndTime,
+          postType: 'MorningReadiness',
+          shiftType: 'day',
+          isSpecial: true,
+          specialType: 'morning_readiness',
+          peopleCount: 9,
+          periodId,
+          guardId
+        }
+      });
+    }
+
+    currentDate = addHours(currentDate, 24);
+  }
 }
