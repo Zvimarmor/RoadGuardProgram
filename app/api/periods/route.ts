@@ -90,8 +90,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // P0-1: Use transaction to prevent race condition and ensure atomicity
-    const completePeriod = await prisma.$transaction(async (tx) => {
+    // P0-1: Use transaction to prevent race condition for period creation
+    // Note: Shift generation happens AFTER transaction to avoid complexity
+    const period = await prisma.$transaction(async (tx) => {
       // Check if any active periods exist
       const existingPeriods = await tx.guardPeriod.findMany({});
 
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create period
-      const period = await tx.guardPeriod.create({
+      const newPeriod = await tx.guardPeriod.create({
         data: {
           name,
           startDate: start,
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
       if (uniqueGuards.length > 0) {
         const guardsToCreate = uniqueGuards.map((guard: GuardInput) => ({
           name: guard.name.trim(),
-          periodId: period.id,
+          periodId: newPeriod.id,
           totalHours: 0
         }));
 
@@ -127,25 +128,26 @@ export async function POST(request: NextRequest) {
         console.log(`Successfully created ${guardsToCreate.length} guards`);
       }
 
-      // Generate shifts for the period (can throw, will rollback entire transaction)
-      await generateShiftsForPeriod(period.id);
-
-      // Fetch the complete period with all relations
-      const result = await tx.guardPeriod.findUnique({
-        where: { id: period.id },
-        include: {
-          guards: true,
-          shifts: {
-            include: { guard: true },
-            orderBy: { startTime: 'asc' }
-          }
-        }
-      });
-
-      return result;
+      return newPeriod;
     }, {
-      timeout: 120000, // 2 minutes timeout for long periods
-      maxWait: 10000   // Max 10 seconds wait to acquire transaction
+      timeout: 30000, // 30 seconds for period+guards creation
+      maxWait: 10000  // Max 10 seconds wait to acquire transaction
+    });
+
+    // Generate shifts AFTER transaction (uses separate queries)
+    // If this fails, period exists but has no shifts (acceptable - admin can retry)
+    await generateShiftsForPeriod(period.id);
+
+    // Fetch the complete period with all relations
+    const completePeriod = await prisma.guardPeriod.findUnique({
+      where: { id: period.id },
+      include: {
+        guards: true,
+        shifts: {
+          include: { guard: true },
+          orderBy: { startTime: 'asc' }
+        }
+      }
     });
 
     return NextResponse.json(completePeriod, { status: 201 });
