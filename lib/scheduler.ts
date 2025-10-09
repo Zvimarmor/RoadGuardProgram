@@ -256,37 +256,42 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
       israelEnd: morningEndTime.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })
     });
 
-    // Find guards on duty around 05:30 (between 04:00 and 06:00)
-    const guardsOnDuty = await prisma.shift.findMany({
+    // Find guards who had shifts ending close to morning readiness time (to exclude them)
+    // Exclude guards whose shift ends within 2 hours before morning readiness (03:30-05:30)
+    const recentShiftEndTime = new Date(morningStartTime.getTime() - (2 * 60 * 60 * 1000)); // 2 hours before
+    const guardsToExclude = await prisma.shift.findMany({
       where: {
         periodId,
-        startTime: { lte: morningStartTime },
-        endTime: { gte: morningStartTime }
+        endTime: { gte: recentShiftEndTime, lte: morningStartTime }
       },
-      include: { guard: true },
+      select: { guardId: true },
       distinct: ['guardId']
     });
+
+    const excludedGuardIds = guardsToExclude
+      .map(s => s.guardId)
+      .filter((id): id is string => id !== null);
 
     // We need 9 guards for morning readiness
     const selectedGuardIds: string[] = [];
 
-    // First, add guards who are already on duty
-    guardsOnDuty.forEach(shift => {
-      if (shift.guardId && selectedGuardIds.length < 9) {
-        selectedGuardIds.push(shift.guardId);
-      }
-    });
-
     // Fill remaining slots with guards with lowest total hours
-    // Exclude guards who were in morning readiness yesterday
+    // Exclude: guards from yesterday, guards with recent shifts ending close to 05:30
     while (selectedGuardIds.length < 9) {
-      const excludeIds = [...selectedGuardIds, ...previousDayGuards];
+      const excludeIds = [...selectedGuardIds, ...previousDayGuards, ...excludedGuardIds];
       const guardId = await getNextAvailableGuard(periodId, excludeIds);
       if (!guardId) {
-        // If we can't find enough guards without repeats, allow previous day guards
-        const guardIdWithRepeat = await getNextAvailableGuard(periodId, selectedGuardIds);
-        if (!guardIdWithRepeat) break;
-        selectedGuardIds.push(guardIdWithRepeat);
+        // If we can't find enough guards, relax the constraints (allow previous day guards)
+        const excludeIdsRelaxed = [...selectedGuardIds, ...excludedGuardIds];
+        const guardIdWithRepeat = await getNextAvailableGuard(periodId, excludeIdsRelaxed);
+        if (!guardIdWithRepeat) {
+          // Last resort: just exclude selected guards
+          const guardIdLastResort = await getNextAvailableGuard(periodId, selectedGuardIds);
+          if (!guardIdLastResort) break;
+          selectedGuardIds.push(guardIdLastResort);
+        } else {
+          selectedGuardIds.push(guardIdWithRepeat);
+        }
       } else {
         selectedGuardIds.push(guardId);
       }
