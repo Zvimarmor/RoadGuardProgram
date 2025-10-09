@@ -158,35 +158,36 @@ export async function assignGuardsToShifts(
     where: { periodId, isActive: true }
   });
 
+  // P1-2: Optimize by fetching all assigned shifts once (fix N+1 query problem)
+  const allAssignedShifts = await prisma.shift.findMany({
+    where: {
+      periodId,
+      guardId: { not: null }
+    },
+    select: {
+      guardId: true,
+      startTime: true,
+      endTime: true
+    }
+  });
+
   let assignedInCurrentRound = 0;
   let roundOffset = 0; // Used to rotate guard selection each round
 
   for (const shift of unassignedShifts) {
     // Find guards who are NOT already assigned to an overlapping shift
-    const busyGuards = await prisma.shift.findMany({
-      where: {
-        periodId,
-        guardId: { not: null },
-        OR: [
-          {
-            // Shift starts during this shift
-            startTime: { gte: shift.startTime, lt: shift.endTime }
-          },
-          {
-            // Shift ends during this shift
-            endTime: { gt: shift.startTime, lte: shift.endTime }
-          },
-          {
-            // Shift completely contains this shift
-            startTime: { lte: shift.startTime },
-            endTime: { gte: shift.endTime }
-          }
-        ]
-      },
-      select: { guardId: true }
-    });
-
-    const busyGuardIds = busyGuards.map(s => s.guardId).filter((id): id is string => id !== null);
+    // P0-2: Fixed boundary detection to use inclusive comparisons
+    // Filter in-memory instead of database query for each shift
+    const busyGuardIds = allAssignedShifts
+      .filter(s => {
+        // Check if shifts overlap (inclusive boundaries)
+        const startsOverlap = s.startTime >= shift.startTime && s.startTime <= shift.endTime;
+        const endsOverlap = s.endTime >= shift.startTime && s.endTime <= shift.endTime;
+        const contains = s.startTime <= shift.startTime && s.endTime >= shift.endTime;
+        return startsOverlap || endsOverlap || contains;
+      })
+      .map(s => s.guardId)
+      .filter((id): id is string => id !== null);
 
     const guardId = await getNextAvailableGuard(periodId, busyGuardIds);
 
@@ -212,6 +213,13 @@ export async function assignGuardsToShifts(
         }
       })
     ]);
+
+    // Update in-memory cache for overlap detection
+    allAssignedShifts.push({
+      guardId,
+      startTime: shift.startTime,
+      endTime: shift.endTime
+    });
 
     // Track rounds: when all guards have been assigned once, start new round with rotation
     assignedInCurrentRound++;
@@ -256,13 +264,16 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
       israelEnd: morningEndTime.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })
     });
 
-    // Exclude guards whose shift ends within 4 hours before morning readiness (they need sleep)
+    // P1-4: Exclude guards whose shift STARTS OR ENDS within 4 hours before morning readiness
     // This prevents cases like: shift 01:00-03:00, then morning readiness 05:30-11:00
     const minimumSleepTime = new Date(morningStartTime.getTime() - (4 * 60 * 60 * 1000)); // 4 hours before (01:30)
     const guardsToExclude = await prisma.shift.findMany({
       where: {
         periodId,
-        endTime: { gte: minimumSleepTime, lt: morningStartTime }
+        OR: [
+          { endTime: { gte: minimumSleepTime, lte: morningStartTime } },
+          { startTime: { gte: minimumSleepTime, lte: morningStartTime } }
+        ]
       },
       select: { guardId: true },
       distinct: ['guardId']
@@ -277,24 +288,35 @@ async function generateMorningReadinessShifts(periodId: string): Promise<void> {
 
     // Fill slots with guards with lowest total hours
     // Exclude: guards from yesterday (no consecutive days), guards with recent shifts (need sleep)
+    // P0-3: Fixed to prevent exceeding 9 guards
     while (selectedGuardIds.length < 9) {
       const excludeIds = [...selectedGuardIds, ...previousDayGuards, ...excludedGuardIds];
       const guardId = await getNextAvailableGuard(periodId, excludeIds);
-      if (!guardId) {
+
+      if (guardId) {
+        selectedGuardIds.push(guardId);
+      } else {
         // If we can't find enough guards, relax only the consecutive day constraint
         const excludeIdsRelaxed = [...selectedGuardIds, ...excludedGuardIds];
         const guardIdWithRepeat = await getNextAvailableGuard(periodId, excludeIdsRelaxed);
-        if (!guardIdWithRepeat) {
+
+        if (guardIdWithRepeat) {
+          selectedGuardIds.push(guardIdWithRepeat);
+        } else {
           // Last resort: just exclude selected guards and those with recent shifts (maintain sleep time)
           const guardIdLastResort = await getNextAvailableGuard(periodId, [...selectedGuardIds, ...excludedGuardIds]);
-          if (!guardIdLastResort) break;
-          selectedGuardIds.push(guardIdLastResort);
-        } else {
-          selectedGuardIds.push(guardIdWithRepeat);
+
+          if (guardIdLastResort) {
+            selectedGuardIds.push(guardIdLastResort);
+          } else {
+            // Can't find any more guards, stop trying
+            break;
+          }
         }
-      } else {
-        selectedGuardIds.push(guardId);
       }
+
+      // Safety check to prevent exceeding 9 guards
+      if (selectedGuardIds.length >= 9) break;
     }
 
     // Store today's guards for next iteration

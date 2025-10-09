@@ -38,34 +38,79 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Delete all existing periods (only one period should exist at a time)
-    await prisma.guardPeriod.deleteMany({});
+    // P0-5: Validate dates and shift length
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const shiftLen = parseFloat(shiftLength);
 
-    // Create period
-    const period = await prisma.guardPeriod.create({
-      data: {
-        name,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        shiftLength: parseFloat(shiftLength)
-      }
-    });
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date format' },
+        { status: 400 }
+      );
+    }
 
-    // Add guards if provided (filter duplicates by name)
+    if (end <= start) {
+      return NextResponse.json(
+        { error: 'End date must be after start date' },
+        { status: 400 }
+      );
+    }
+
+    if (shiftLen <= 0 || shiftLen > 24) {
+      return NextResponse.json(
+        { error: 'Shift length must be between 0 and 24 hours' },
+        { status: 400 }
+      );
+    }
+
+    // Process guards and validate count
+    interface GuardInput {
+      name: string;
+    }
+
+    let uniqueGuards: GuardInput[] = [];
+
     if (guards && Array.isArray(guards)) {
       console.log('Received guards:', JSON.stringify(guards, null, 2));
 
-      interface GuardInput {
-        name: string;
-      }
-
-      const uniqueGuards = (guards as GuardInput[]).filter((guard: GuardInput, index: number, self: GuardInput[]) =>
+      uniqueGuards = (guards as GuardInput[]).filter((guard: GuardInput, index: number, self: GuardInput[]) =>
         guard.name && guard.name.trim() &&
         index === self.findIndex((g: GuardInput) => g.name.trim() === guard.name.trim())
       );
 
       console.log('Unique guards after filtering:', JSON.stringify(uniqueGuards, null, 2));
+    }
 
+    // P1-3: Validate minimum guard count (need 4 for night shifts: 2 posts × 2 guards)
+    if (uniqueGuards.length < 4) {
+      return NextResponse.json(
+        { error: 'Minimum 4 guards required (night shifts need 4 simultaneous guards)' },
+        { status: 400 }
+      );
+    }
+
+    // P0-1: Use transaction to prevent race condition and ensure atomicity
+    const completePeriod = await prisma.$transaction(async (tx) => {
+      // Check if any active periods exist
+      const existingPeriods = await tx.guardPeriod.findMany({});
+
+      // Delete existing periods only after checking (prevents race condition)
+      if (existingPeriods.length > 0) {
+        await tx.guardPeriod.deleteMany({});
+      }
+
+      // Create period
+      const period = await tx.guardPeriod.create({
+        data: {
+          name,
+          startDate: start,
+          endDate: end,
+          shiftLength: shiftLen
+        }
+      });
+
+      // Add guards
       if (uniqueGuards.length > 0) {
         const guardsToCreate = uniqueGuards.map((guard: GuardInput) => ({
           name: guard.name.trim(),
@@ -75,31 +120,32 @@ export async function POST(request: NextRequest) {
 
         console.log('Creating guards:', JSON.stringify(guardsToCreate, null, 2));
 
-        await prisma.guard.createMany({
+        await tx.guard.createMany({
           data: guardsToCreate
         });
 
         console.log(`Successfully created ${guardsToCreate.length} guards`);
-      } else {
-        console.log('No unique guards to create');
       }
-    } else {
-      console.log('No guards array provided or guards is not an array');
-    }
 
-    // Generate shifts for the period
-    await generateShiftsForPeriod(period.id);
+      // Generate shifts for the period (can throw, will rollback entire transaction)
+      await generateShiftsForPeriod(period.id);
 
-    // Fetch the complete period with all relations
-    const completePeriod = await prisma.guardPeriod.findUnique({
-      where: { id: period.id },
-      include: {
-        guards: true,
-        shifts: {
-          include: { guard: true },
-          orderBy: { startTime: 'asc' }
+      // Fetch the complete period with all relations
+      const result = await tx.guardPeriod.findUnique({
+        where: { id: period.id },
+        include: {
+          guards: true,
+          shifts: {
+            include: { guard: true },
+            orderBy: { startTime: 'asc' }
+          }
         }
-      }
+      });
+
+      return result;
+    }, {
+      timeout: 120000, // 2 minutes timeout for long periods
+      maxWait: 10000   // Max 10 seconds wait to acquire transaction
     });
 
     return NextResponse.json(completePeriod, { status: 201 });

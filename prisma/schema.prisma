@@ -68,7 +68,11 @@ model Shift {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Performance indexes for overlap detection and filtering
   @@index([periodId, startTime])
+  @@index([periodId, guardId])
+  @@index([periodId, endTime])
+  @@index([periodId, startTime, endTime])
 }
 
 // Special activity session that pauses normal scheduling

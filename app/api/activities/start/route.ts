@@ -6,7 +6,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { periodId, name, guardIds, description } = body;
 
+    // P2-5: Validate guardIds
+    if (!guardIds || guardIds.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one guard must be selected for the activity' },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
+
+    // P0-4: Before deleting shifts, decrement guard hours for assigned shifts
+    const futureShifts = await prisma.shift.findMany({
+      where: {
+        periodId,
+        startTime: { gte: now },
+        isSpecial: false,
+        guardId: { not: null }
+      }
+    });
+
+    // Decrement hours for each assigned shift that will be deleted
+    for (const shift of futureShifts) {
+      if (shift.guardId) {
+        const duration = (shift.endTime.getTime() - shift.startTime.getTime()) / (1000 * 60 * 60);
+        await prisma.guard.update({
+          where: { id: shift.guardId },
+          data: {
+            totalHours: {
+              decrement: duration
+            }
+          }
+        });
+      }
+    }
 
     // Create the activity (without endTime - null endTime means active)
     const activity = await prisma.activitySession.create({
