@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מדריך משתמש - מערכת ניהול שמירות</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.8;
+            color: #1a1a1a;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        h3 {
+            color: #764ba2;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        h4 {
+            color: #555;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 15px;
+            color: #444;
+        }
+
+        ul, ol {
+            margin-right: 25px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .highlight-box {
+            background: #f0f4ff;
+            border-right: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .warning-box {
+            background: #fff4e6;
+            border-right: 4px solid #ff9800;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .success-box {
+            background: #e8f5e9;
+            border-right: 4px solid #4caf50;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: right;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .badge-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .badge-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .toc {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .toc h3 {
+            color: #667eea;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-right: 0;
+        }
+
+        .toc li {
+            margin-bottom: 8px;
+        }
+
+        .toc a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .toc a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .emoji {
+            font-size: 1.3em;
+            margin-left: 8px;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #e0e0e0;
+            margin: 40px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            h2 {
+                font-size: 1.5em;
+            }
+
+            .content {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 מדריך משתמש</h1>
+            <p>מערכת ניהול שמירות - הכל שצריך לדעת</p>
+        </div>
+
+        <div class="content">
+            <div class="toc">
+                <h3>תוכן עניינים</h3>
+                <ul>
+                    <li><a href="#intro">1. מבוא</a></li>
+                    <li><a href="#login">2. התחברות למערכת</a></li>
+                    <li><a href="#user">3. משתמש רגיל - צפייה בשמירות</a></li>
+                    <li><a href="#admin">4. מנהל - ניהול המערכת</a></li>
+                    <li><a href="#shift-types">5. סוגי שמירות</a></li>
+                    <li><a href="#faq">6. שאלות נפוצות</a></li>
+                </ul>
+            </div>
+
+            <div class="section" id="intro">
+                <h2>מבוא</h2>
+
+                <h3>מה זה מערכת ניהול שמירות?</h3>
+                <p>מערכת זו עוזרת לך לנהל ולצפות בלוח השמירות שלך באופן אוטומטי וחכם. המערכת:</p>
+
+                <div class="highlight-box">
+                    <ul>
+                        <li><strong>יוצרת לוח שמירות אוטומטי</strong> - אין צורך לסדר ידנית!</li>
+                        <li><strong>מחלקת שעות בצורה הוגנת</strong> - כולם יקבלו כמות שעות דומה</li>
+                        <li><strong>מנהלת כוננות בוקר</strong> - כל בוקר בשעה 05:30-11:00</li>
+                        <li><strong>מאפשרת פעילויות מיוחדות</strong> - ניתן להשהות את לוח השמירות לאימונים או תרגילים</li>
+                    </ul>
+                </div>
+
+                <h3>למי המערכת מיועדת?</h3>
+                <ul>
+                    <li><span class="badge badge-primary">שומרים</span> צפייה בשמירות האישיות והכלליות</li>
+                    <li><span class="badge badge-warning">מנהלים</span> יצירת תקופות, הוספת/הסרת שומרים, ניהול פעילויות</li>
+                </ul>
+            </div>
+
+            <hr>
+
+            <div class="section" id="login">
+                <h2>התחברות למערכת</h2>
+
+                <h3>כניסה כמשתמש רגיל</h3>
+                <div class="success-box">
+                    <p><strong>✅ אין צורך בהתחברות למשתמשים רגילים!</strong></p>
+                    <ol>
+                        <li>היכנס לכתובת האתר: <code>https://guardinglist.zvimarmor.com</code></li>
+                        <li>תגיע לעמוד הבית</li>
+                        <li>תוכל לראות את השמירות הנוכחיות והבאות</li>
+                    </ol>
+                </div>
+
+                <h3>כניסה כמנהל</h3>
+                <ol>
+                    <li>לחץ על <strong>"ניהול שמירה"</strong> בתפריט העליון</li>
+                    <li>הזן את פרטי ההתחברות</li>
+                    <li>לחץ על <strong>"התחבר"</strong></li>
+                </ol>
+            </div>
+
+            <hr>
+
+            <div class="section" id="user">
+                <h2>משתמש רגיל - צפייה בשמירות</h2>
+
+                <h3><span class="emoji">📍</span>עמוד הבית</h3>
+                <p>כשאתה נכנס לאתר, תראה:</p>
+
+                <h4>השמירות הנוכחיות</h4>
+                <ul>
+                    <li>מציג את כל השמירות שפעילות <strong>כרגע</strong></li>
+                    <li>רואים מי שומר באיזה עמדה (ש״ג, צפונית, מערבית)</li>
+                    <li>העמוד מתעדכן אוטומטית כל 30 שניות</li>
+                </ul>
+
+                <div class="code-block">
+ש״ג - דוד כהן
+צפונית - יוסי לוי
+מערבית - משה ישראלי
+                </div>
+
+                <h4><span class="emoji">🕐</span>השמירה הבאה</h4>
+                <ul>
+                    <li>מציג את כל השמירות <strong>שיתחילו בזמן הקרוב ביותר</strong></li>
+                    <li>עוזר לך לדעת מי עולה למשמרת הבאה</li>
+                </ul>
+
+                <h3><span class="emoji">📊</span>לוח השמירות (כל השמירות)</h3>
+                <p>לחץ על <strong>"לוח השמירות"</strong> בתפריט העליון כדי לראות את כל השמירות.</p>
+
+                <h4>סינון שמירות</h4>
+                <p>את/ה יכול/ה לסנן את השמירות לפי:</p>
+
+                <div class="highlight-box">
+                    <p><strong>1. סינון לפי תאריך:</strong></p>
+                    <ul>
+                        <li>לחץ על שדה "סנן לפי תאריך"</li>
+                        <li>בחר תאריך מהלוח</li>
+                        <li>תראה רק שמירות מהתאריך הזה</li>
+                    </ul>
+
+                    <p><strong>2. סינון לפי עמדה:</strong></p>
+                    <ul>
+                        <li>פתח את התפריט "סנן לפי עמדה"</li>
+                        <li>בחר עמדה: הכל / ש״ג / צפונית / מערבית / כוננות בוקר</li>
+                    </ul>
+
+                    <p><strong>3. ניקוי סינונים:</strong></p>
+                    <ul>
+                        <li>לחץ על <strong>"נקה סינונים"</strong> כדי לראות הכל שוב</li>
+                    </ul>
+                </div>
+
+                <h4>מה מוצג בטבלה?</h4>
+                <div class="table-container">
+                    <table>
+                        <tr>
+                            <th>עמודה</th>
+                            <th>מה זה אומר</th>
+                        </tr>
+                        <tr>
+                            <td><strong>שם השומר</strong></td>
+                            <td>מי משובץ לשמירה</td>
+                        </tr>
+                        <tr>
+                            <td><strong>תאריך</strong></td>
+                            <td>איזה יום השמירה</td>
+                        </tr>
+                        <tr>
+                            <td><strong>שעת התחלה</strong></td>
+                            <td>מתי השמירה מתחילה</td>
+                        </tr>
+                        <tr>
+                            <td><strong>שעת סיום</strong></td>
+                            <td>מתי השמירה מסתיימת</td>
+                        </tr>
+                        <tr>
+                            <td><strong>עמדה</strong></td>
+                            <td>איזו עמדה (ש״ג/צפונית/מערבית)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>סוג</strong></td>
+                            <td>יום/לילה/מיוחד</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <h3><span class="emoji">👤</span>השמירות שלי</h3>
+                <p>לחץ על <strong>"השמירות שלי"</strong> בתפריט העליון כדי לראות את השמירות האישיות שלך.</p>
+
+                <h4>איך זה עובד?</h4>
+                <ol>
+                    <li><strong>שלב 1: בחר את השם שלך</strong>
+                        <ul>
+                            <li>פתח את התפריט "בחר שומר"</li>
+                            <li>חפש את השם שלך ברשימה</li>
+                            <li>לחץ עליו</li>
+                        </ul>
+                    </li>
+                    <li><strong>שלב 2: צפה בשמירות שלך</strong>
+                        <ul>
+                            <li>תראה רק את השמירות שלך</li>
+                            <li>הטבלה ממוינת לפי תאריך</li>
+                            <li>רק שמירות עתידיות (לא עבר)</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <hr>
+
+            <div class="section" id="admin">
+                <h2>מנהל - ניהול המערכת</h2>
+
+                <h3><span class="emoji">➕</span>יצירת תקופת שמירה חדשה</h3>
+
+                <div class="warning-box">
+                    <p><strong>מתי להשתמש בזה?</strong></p>
+                    <p>כשאתה רוצה להתחיל תקופה חדשה (למשל: שבוע חדש, חודש חדש)</p>
+                </div>
+
+                <h4>שלבים:</h4>
+                <ol>
+                    <li><strong>כניסה לפאנל ניהול:</strong>
+                        <ul>
+                            <li>לחץ על "ניהול שמירה" בתפריט</li>
+                            <li>התחבר עם שם משתמש וסיסמה</li>
+                        </ul>
+                    </li>
+                    <li><strong>לחץ על "צור תקופת שמירה חדשה"</strong></li>
+                    <li><strong>מלא את הפרטים:</strong>
+                        <div class="highlight-box">
+                            <p><strong>שם התקופה:</strong> תן שם מזהה לתקופה (דוגמה: "שבוע 1 - אוקטובר 2025")</p>
+                            <p><strong>תאריך התחלה:</strong> בחר מתי התקופה מתחילה (שים לב לשעה!)</p>
+                            <p><strong>תאריך סיום:</strong> בחר מתי התקופה מסתיימת</p>
+                            <p><strong>אורך משמרת:</strong> בחר 1.5 שעות או 2 שעות</p>
+                            <p><strong>שומרים:</strong> הקלד שם אחד בכל שורה</p>
+                        </div>
+                        <div class="code-block">
+דוד כהן
+יוסי לוי
+משה ישראלי
+                        </div>
+                    </li>
+                    <li><strong>לחץ על "צור תקופה"</strong></li>
+                    <li><strong>המערכת תעשה את העבודה:</strong>
+                        <ul>
+                            <li>יוצרת אוטומטית את כל השמירות</li>
+                            <li>משבצת שומרים בצורה הוגנת</li>
+                            <li>מוסיפה כוננות בוקר כל יום</li>
+                        </ul>
+                    </li>
+                </ol>
+
+                <div class="success-box">
+                    <p><strong>⏱️ זה לוקח כמה שניות - המערכת עובדת!</strong></p>
+                </div>
+
+                <h3><span class="emoji">👥</span>הוספת/הסרת שומר</h3>
+
+                <h4>הוספת שומר חדש</h4>
+                <ol>
+                    <li>לחץ על "הוסף / הסר שומר"</li>
+                    <li>בחלק "הוסף שומר חדש": הקלד את שם השומר</li>
+                    <li>לחץ על <strong>"הוסף שומר"</strong></li>
+                    <li>המערכת תוסיף את השומר ותאזן מחדש את כל השמירות</li>
+                </ol>
+
+                <h4>הסרת שומר</h4>
+                <ol>
+                    <li>לחץ על "הוסף / הסר שומר"</li>
+                    <li>בחלק "הסר שומר": בחר שומר מהרשימה</li>
+                    <li>לחץ על <strong>"הסר שומר"</strong></li>
+                    <li>אשר את הפעולה</li>
+                    <li>המערכת תסיר את השומר ותחלק מחדש את השמירות</li>
+                </ol>
+
+                <h3><span class="emoji">🎯</span>התחלת פעילות מיוחדת</h3>
+
+                <div class="warning-box">
+                    <p><strong>מתי להשתמש בזה?</strong> אימונים, תרגילים, פעילויות מיוחדות שדורשות שומרים</p>
+                    <p><strong>מה זה עושה?</strong> עוצר את לוח השמירות הרגיל ומשבץ רק את השומרים שבחרת</p>
+                </div>
+
+                <h4>איך להתחיל פעילות?</h4>
+                <ol>
+                    <li>לחץ על "התחל תקופת השהייה (פעילות מיוחדת)"</li>
+                    <li>מלא פרטים:
+                        <ul>
+                            <li><strong>שם הפעילות:</strong> תן שם מזהה (דוגמה: "אימון מיוחד")</li>
+                            <li><strong>תיאור (אופציונלי):</strong> פרטים נוספים</li>
+                            <li><strong>בחר שומרים:</strong> סמן את כל השומרים שישתתפו</li>
+                        </ul>
+                    </li>
+                    <li>לחץ על "התחל פעילות"</li>
+                </ol>
+
+                <h4>איך לעצור פעילות?</h4>
+                <ol>
+                    <li>בעמוד הניהול תראה <strong>"פעילויות פעילות כעת"</strong></li>
+                    <li>לחץ על "עצור פעילות"</li>
+                    <li>המערכת תעצור את הפעילות ותחדש את לוח השמירות הרגיל</li>
+                </ol>
+            </div>
+
+            <hr>
+
+            <div class="section" id="shift-types">
+                <h2>סוגי שמירות</h2>
+
+                <h3><span class="emoji">☀️</span>שמירות יום (08:00-19:00)</h3>
+                <div class="highlight-box">
+                    <ul>
+                        <li><strong>3 עמדות:</strong> ש״ג, צפונית, מערבית</li>
+                        <li><strong>1 שומר בכל עמדה</strong></li>
+                        <li><span class="badge badge-success">נספרות בשעות</span> כן, נספרות בסך השעות של השומר</li>
+                    </ul>
+                </div>
+
+                <h3><span class="emoji">🌙</span>שמירות לילה (19:00-08:00)</h3>
+                <div class="highlight-box">
+                    <ul>
+                        <li><strong>2 עמדות:</strong> ש״ג, צפונית</li>
+                        <li><strong>2 שומרים בכל עמדה</strong></li>
+                        <li><span class="badge badge-success">נספרות בשעות</span> כן, נספרות בסך השעות של השומר</li>
+                    </ul>
+                </div>
+
+                <h3><span class="emoji">🌅</span>כוננות בוקר (05:30-11:00)</h3>
+                <div class="warning-box">
+                    <ul>
+                        <li><strong>9 שומרים</strong> בכל בוקר</li>
+                        <li><span class="badge badge-warning">לא נספרות בשעות</span> זו חובה של נוכחות</li>
+                        <li><strong>חכם:</strong> המערכת לא תשבץ:
+                            <ul>
+                                <li>שומרים שסיימו משמרת 4 שעות לפני (01:30-05:30)</li>
+                                <li>שומרים שהיו בכוננות בוקר אתמול</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p><strong>💡 למה זה חשוב?</strong> השומר לא יהיה עייף מדי - הוא לא יצטרך לשמור עד 03:00 ואז להתייצב ב-05:30!</p>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="section" id="faq">
+                <h2>שאלות נפוצות</h2>
+
+                <h4>❓ האם אני צריך להתחבר כדי לראות שמירות?</h4>
+                <p><strong>לא!</strong> משתמשים רגילים יכולים לראות את כל השמירות ללא התחברות. רק מנהלים צריכים להתחבר.</p>
+
+                <h4>❓ איך אני יודע מתי אני משבץ?</h4>
+                <p>לך ל<strong>"השמירות שלי"</strong>, בחר את השם שלך, ותראה את כל השמירות שלך.</p>
+
+                <h4>❓ למה לא רואים שמירות?</h4>
+                <p>יכול להיות שאין תקופה פעילה. בדוק עם המנהל או צור תקופה חדשה.</p>
+
+                <h4>❓ האם כוננות בוקר נחשבת כשעות?</h4>
+                <p><strong>לא.</strong> כוננות בוקר היא חובת נוכחות ולא נספרת בסך השעות.</p>
+
+                <h4>❓ מה קורה אם מוחקים תקופה?</h4>
+                <p>כל השמירות של התקופה נמחקות. <strong>אזהרה:</strong> זו פעולה בלתי הפיכה!</p>
+
+                <h4>❓ איך מוסיפים שומר באמצע תקופה?</h4>
+                <p>לך ל<strong>"הוסף / הסר שומר"</strong>, הקלד את השם, והמערכת תשבץ אותו אוטומטית בשמירות עתידיות.</p>
+            </div>
+
+            <div class="success-box" style="text-align: center; margin-top: 50px;">
+                <h3>זקוקים לעזרה נוספת?</h3>
+                <p>צרו קשר עם המפתח או המנהל שלכם</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

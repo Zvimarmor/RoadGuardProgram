@@ -33,7 +33,7 @@ export default function Navigation() {
             ))}
           </div>
           <a
-            href="/USER_MANUAL_HE.md"
+            href="/user-manual.html"
             target="_blank"
             rel="noopener noreferrer"
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full border-2 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-neutral-900 dark:hover:border-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
