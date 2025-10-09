@@ -189,6 +189,41 @@ export async function assignGuardsToShifts(
       .map(s => s.guardId)
       .filter((id): id is string => id !== null);
 
+    // FEATURE: Exclude guards in morning readiness from shifts that extend beyond 11:00
+    // Prevents guards from being awake 05:30-11:00 (morning readiness) + 10:00-12:00 (shift)
+    const shiftEndHour = shift.endTime.getHours();
+    const shiftEndMinute = shift.endTime.getMinutes();
+    const shiftEndTimeInMinutes = shiftEndHour * 60 + shiftEndMinute;
+    const morningReadinessEnd = 11 * 60; // 11:00
+
+    const extendsAfterMorningReadiness = shiftEndTimeInMinutes > morningReadinessEnd;
+
+    if (extendsAfterMorningReadiness) {
+      // Find guards who have morning readiness on this day and exclude them
+      const shiftDate = new Date(shift.startTime);
+      shiftDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(shiftDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      const morningReadinessShifts = await prisma.shift.findMany({
+        where: {
+          periodId,
+          startTime: { gte: shiftDate, lt: nextDay },
+          isSpecial: true,
+          specialType: 'morning_readiness',
+          guardId: { not: null }
+        },
+        select: { guardId: true }
+      });
+
+      const morningReadinessGuardIds = morningReadinessShifts
+        .map(s => s.guardId)
+        .filter((id): id is string => id !== null);
+
+      // Add morning readiness guards to busy list (exclude them from this shift)
+      busyGuardIds.push(...morningReadinessGuardIds);
+    }
+
     const guardId = await getNextAvailableGuard(periodId, busyGuardIds);
 
     if (!guardId) {
