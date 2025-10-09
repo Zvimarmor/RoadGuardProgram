@@ -317,20 +317,9 @@ export default function Admin() {
     <div className="min-h-screen p-6 sm:p-8 lg:p-12">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-10">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-4xl font-bold mb-2 tracking-tight">פאנל ניהול</h1>
-              <p className="text-neutral-600 dark:text-neutral-400">ניהול תקופות, שומרים ופעילויות</p>
-            </div>
-            <a
-              href="/USER_MANUAL_HE.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-2 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-neutral-900 dark:hover:border-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-              title="מדריך למשתמש"
-            >
-              <span className="text-sm font-bold">i</span>
-            </a>
+          <div>
+            <h1 className="text-4xl font-bold mb-2 tracking-tight">פאנל ניהול</h1>
+            <p className="text-neutral-600 dark:text-neutral-400">ניהול תקופות, שומרים ופעילויות</p>
           </div>
           <button
             onClick={() => setIsAuthenticated(false)}

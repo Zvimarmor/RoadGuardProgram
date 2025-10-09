@@ -32,7 +32,15 @@ export default function Navigation() {
               </Link>
             ))}
           </div>
-          {/* <h1 className="text-2xl font-bold tracking-tight">ניהול שמירות</h1> */}
+          <a
+            href="/USER_MANUAL_HE.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full border-2 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-400 hover:border-neutral-900 dark:hover:border-neutral-100 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+            title="מדריך למשתמש"
+          >
+            <span className="text-base font-bold">i</span>
+          </a>
         </div>
       </div>
     </nav>
