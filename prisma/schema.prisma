@@ -17,7 +17,7 @@ model GuardPeriod {
   name          String    // e.g., "Week 1 - January 2024"
   startDate     DateTime
   endDate       DateTime
-  shiftLength   Float     // in hours (1.5 or 2)
+  shiftLength   Float     // in hours (1, 1.5, or 2)
 
   guards        Guard[]
   shifts        Shift[]

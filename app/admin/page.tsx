@@ -440,6 +440,7 @@ export default function Admin() {
                     onChange={(e) => setShiftLength(e.target.value)}
                     className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none"
                   >
+                    <option value="1">1 שעה</option>
                     <option value="1.5">1.5 שעות</option>
                     <option value="2">2 שעות</option>
                   </select>
