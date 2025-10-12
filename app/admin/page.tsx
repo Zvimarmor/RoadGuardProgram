@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 interface Guard {
   id: string;
@@ -21,6 +23,19 @@ interface Activity {
   name: string;
   endTime: Date | null;
   description?: string;
+}
+
+interface Shift {
+  id: string;
+  startTime: string;
+  endTime: string;
+  postType: string;
+  shiftType: string;
+  isSpecial: boolean;
+  guard: {
+    name: string;
+    rank?: string;
+  } | null;
 }
 
 export default function Admin() {
@@ -51,10 +66,30 @@ export default function Admin() {
   const [selectedActivityGuards, setSelectedActivityGuards] = useState<string[]>([]);
   const [activeActivities, setActiveActivities] = useState<(Activity & { startTime?: Date })[]>([]);
 
+  // Schedule editing state
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [filterDate, setFilterDate] = useState<string>('');
+  const [isSwapping, setIsSwapping] = useState(false);
+
+  // Save guards for next time (localStorage)
+  const [saveForNextTime, setSaveForNextTime] = useState(false);
+
   // Fetch current period and guards when modal opens
   useEffect(() => {
     if (activeModal === 'addGuard' || activeModal === 'createActivity') {
       fetchCurrentPeriod();
+    }
+    if (activeModal === 'editSchedule') {
+      fetchShiftsForEditing();
+    }
+    if (activeModal === 'createPeriod') {
+      // Load saved guards from localStorage
+      const savedGuards = localStorage.getItem('savedGuardsList');
+      if (savedGuards) {
+        setGuardsText(savedGuards);
+        setSaveForNextTime(true);
+      }
     }
   }, [activeModal]);
 
@@ -103,7 +138,11 @@ export default function Admin() {
       .split('\n')
       .filter(line => line.trim())
       .map(line => {
-        return { name: line.trim() };
+        const parts = line.split(',').map(p => p.trim());
+        return {
+          name: parts[0],
+          team: parts[1] || '' // Team is optional
+        };
       });
 
     const roundToHalfHour = (dateString: string) => {
@@ -130,12 +169,21 @@ export default function Admin() {
       });
 
       if (res.ok) {
+        // Save guards to localStorage if checkbox is checked
+        if (saveForNextTime) {
+          localStorage.setItem('savedGuardsList', guardsText);
+        } else {
+          localStorage.removeItem('savedGuardsList');
+        }
+
         alert('תקופה נוצרה בהצלחה!');
         setActiveModal(null);
         setPeriodName('');
         setStartDate('');
         setEndDate('');
-        setGuardsText('');
+        if (!saveForNextTime) {
+          setGuardsText('');
+        }
       } else {
         alert('שגיאה ביצירת תקופה');
       }
@@ -264,6 +312,103 @@ export default function Admin() {
     );
   };
 
+  const fetchShiftsForEditing = async () => {
+    try {
+      const periodsRes = await fetch('/api/periods');
+      const periods = await periodsRes.json();
+
+      if (periods.length === 0) return;
+
+      const latestPeriod = periods[0];
+      const periodRes = await fetch(`/api/periods/${latestPeriod.id}`);
+      const periodData = await periodRes.json();
+
+      const now = new Date();
+      const upcomingShifts = (periodData.shifts || [])
+        .filter((shift: Shift) => new Date(shift.startTime) >= now)
+        .sort((a: Shift, b: Shift) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
+
+      setShifts(upcomingShifts);
+    } catch (error) {
+      console.error('Error fetching shifts:', error);
+    }
+  };
+
+  const handleShiftClick = async (shift: Shift) => {
+    if (isSwapping) return; // Prevent clicks during swap
+
+    if (!selectedShift) {
+      // First click - select this shift
+      setSelectedShift(shift);
+    } else {
+      // Second click - attempt to swap
+      const shift1 = selectedShift;
+      const shift2 = shift;
+
+      // Clicking same shift - deselect
+      if (shift1.id === shift2.id) {
+        setSelectedShift(null);
+        return;
+      }
+
+      // Confirm swap
+      const guard1Name = shift1.guard ? shift1.guard.name : 'ללא שומר';
+      const guard2Name = shift2.guard ? shift2.guard.name : 'ללא שומר';
+
+      const shift1Time = `${new Date(shift1.startTime).toLocaleString('he-IL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      const shift2Time = `${new Date(shift2.startTime).toLocaleString('he-IL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+
+      if (!confirm(`האם להחליף בין:\n${guard1Name} - ${translatePost(shift1.postType)} (${shift1Time})\nל-\n${guard2Name} - ${translatePost(shift2.postType)} (${shift2Time})?`)) {
+        setSelectedShift(null);
+        return;
+      }
+
+      setIsSwapping(true);
+
+      try {
+        const res = await fetch('/api/shifts/swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shift1Id: shift1.id,
+            shift2Id: shift2.id
+          })
+        });
+
+        if (res.ok) {
+          alert('שומרים הוחלפו בהצלחה!');
+          fetchShiftsForEditing(); // Refresh
+          setSelectedShift(null);
+        } else {
+          const data = await res.json();
+          alert(`שגיאה: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('Error swapping guards:', error);
+        alert('שגיאה בהחלפת שומרים');
+      } finally {
+        setIsSwapping(false);
+      }
+    }
+  };
+
+  const translatePost = (post: string) => {
+    const translations: Record<string, string> = {
+      'Gate': 'ש״ג',
+      'North': 'צפונית',
+      'West': 'מערבית',
+      'MorningReadiness': 'כוננות בוקר'
+    };
+    return translations[post] || post;
+  };
+
+  const translateShiftType = (type: string) => {
+    return type === 'day' ? 'יום' : 'לילה';
+  };
+
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -389,6 +534,16 @@ export default function Admin() {
               הגדר פעילות מיוחדת שמשהה את לוח השמירות הרגיל
             </p>
           </button>
+
+          <button
+            onClick={() => setActiveModal('editSchedule')}
+            className="group bg-white dark:bg-neutral-900 p-8 rounded-2xl shadow-sm shadow-black/5 dark:shadow-black/20 border border-neutral-200 dark:border-neutral-800 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all text-right"
+          >
+            <h2 className="text-xl font-bold mb-2 group-hover:text-neutral-900 dark:group-hover:text-neutral-100">ערוך לוח שמירות</h2>
+            <p className="text-neutral-600 dark:text-neutral-400 text-[15px] leading-relaxed">
+              החלף שומרים בין משמרות באמצעות לחיצה על משמרת
+            </p>
+          </button>
         </div>
 
         {/* Create Period Modal */}
@@ -447,14 +602,29 @@ export default function Admin() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2.5">שומרים (שורה אחת לכל שומר: שם)</label>
+                  <label className="block text-sm font-semibold mb-2.5">שומרים (שורה אחת לכל שומר: שם, צוות)</label>
                   <textarea
                     value={guardsText}
                     onChange={(e) => setGuardsText(e.target.value)}
                     rows={8}
-                    placeholder="הכנס פה שמות, שם אחד בכל שורה"
+                    placeholder={`דוגמה:\nדני, אלפא\nמשה, אלפא\nיוסי, ברבו\nאבי, ברבו`}
                     className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none font-mono text-sm resize-none"
                   />
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="saveForNextTime"
+                      checked={saveForNextTime}
+                      onChange={(e) => setSaveForNextTime(e.target.checked)}
+                      className="w-4 h-4 rounded border-neutral-300 dark:border-neutral-700"
+                    />
+                    <label htmlFor="saveForNextTime" className="text-sm text-neutral-600 dark:text-neutral-400 cursor-pointer">
+                      שמור רשימה זו לפעם הבאה
+                    </label>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                    הכנס שם וצוות בכל שורה, מופרדים בפסיק. אם אין צוות, רק שם.
+                  </p>
                 </div>
 
                 <div className="flex gap-3 pt-4">
@@ -627,6 +797,136 @@ export default function Admin() {
               ) : (
                 <p className="text-neutral-500 text-center py-8">אין תקופה פעילה</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Schedule Modal */}
+        {activeModal === 'editSchedule' && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => { setActiveModal(null); setSelectedShift(null); }}>
+            <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 max-w-7xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-neutral-200 dark:border-neutral-800" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-3xl font-bold mb-2">ערוך לוח שמירות</h2>
+                  <p className="text-neutral-600 dark:text-neutral-400">לחץ על משמרת ואז לחץ על משמרת אחרת כדי להחליף שומרים (גם בזמנים שונים)</p>
+                  {selectedShift && (
+                    <p className="mt-3 text-lg font-semibold text-blue-600 dark:text-blue-400">
+                      נבחר: {selectedShift.guard?.name || 'ללא שומר'} - {translatePost(selectedShift.postType)} - {new Date(selectedShift.startTime).toLocaleString('he-IL', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setActiveModal(null); setSelectedShift(null); }}
+                  className="text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Date Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold mb-2">סנן לפי תאריך:</label>
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="w-full max-w-xs px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 outline-none"
+                />
+                {filterDate && (
+                  <button
+                    onClick={() => setFilterDate('')}
+                    className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white underline"
+                  >
+                    נקה סינון
+                  </button>
+                )}
+              </div>
+
+              {/* Shifts Table */}
+              <div className="bg-neutral-50 dark:bg-neutral-950 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                {shifts.length === 0 ? (
+                  <div className="p-12 text-center text-neutral-500">אין שמירות להצגה</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+                        <tr>
+                          <th className="px-4 py-3 text-right font-semibold">תאריך</th>
+                          <th className="px-4 py-3 text-right font-semibold">שעה</th>
+                          <th className="px-4 py-3 text-right font-semibold">עמדה</th>
+                          <th className="px-4 py-3 text-right font-semibold">שומר</th>
+                          <th className="px-4 py-3 text-right font-semibold">סוג</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shifts
+                          .filter(shift => {
+                            if (!filterDate) return true;
+                            const shiftDate = new Date(shift.startTime).toISOString().split('T')[0];
+                            return shiftDate === filterDate;
+                          })
+                          .map((shift) => {
+                            const isSelected = selectedShift?.id === shift.id;
+                            const shiftDate = new Date(shift.startTime);
+
+                            return (
+                              <tr
+                                key={shift.id}
+                                onClick={() => handleShiftClick(shift)}
+                                className={`border-b border-neutral-200 dark:border-neutral-700 cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800'
+                                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                                } ${isSwapping ? 'opacity-50 cursor-wait' : ''}`}
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {shiftDate.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })}
+                                </td>
+                                <td className="px-4 py-3 font-mono whitespace-nowrap">
+                                  {shiftDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                                  {' - '}
+                                  {new Date(shift.endTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="px-4 py-3 font-semibold">{translatePost(shift.postType)}</td>
+                                <td className="px-4 py-3 font-medium">
+                                  {shift.guard ? `${shift.guard.rank || ''} ${shift.guard.name}` : '—'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-3 py-1 rounded-full text-sm ${
+                                    shift.isSpecial
+                                      ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                                      : shift.shiftType === 'day'
+                                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                                      : 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+                                  }`}>
+                                    {shift.isSpecial ? 'מיוחד' : translateShiftType(shift.shiftType)}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-between items-center">
+                <button
+                  onClick={() => { setActiveModal(null); setSelectedShift(null); }}
+                  className="px-6 py-3 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-xl font-semibold hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                >
+                  סגור
+                </button>
+                {selectedShift && (
+                  <button
+                    onClick={() => setSelectedShift(null)}
+                    className="px-6 py-3 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-xl font-semibold hover:bg-red-200 dark:hover:bg-red-800"
+                  >
+                    בטל בחירה
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -32,6 +32,7 @@ model Guard {
   id            String    @id @default(cuid())
   name          String
   rank          String    @default("")  // Added rank field
+  team          String    @default("")  // Team name (e.g., "Alpha", "Bravo", "Charlie")
   totalHours    Float     @default(0) // Hours served in this period
   isActive      Boolean   @default(true)
   joinedAt      DateTime  @default(now()) // When they joined this period
@@ -46,6 +47,16 @@ model Guard {
   updatedAt     DateTime  @updatedAt
 
   @@unique([periodId, name]) // Each guard name is unique within a period
+}
+
+// Saved guard template for easy period creation
+model GuardTemplate {
+  id            String    @id @default(cuid())
+  templateName  String    @unique // Name for this saved configuration
+  guards        Json      // Array of { name: string, team: string }
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 // Post types enum - using String for SQLite compatibility

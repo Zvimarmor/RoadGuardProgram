@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     // Process guards and validate count
     interface GuardInput {
       name: string;
+      team?: string;
     }
 
     let uniqueGuards: GuardInput[] = [];
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
       if (uniqueGuards.length > 0) {
         const guardsToCreate = uniqueGuards.map((guard: GuardInput) => ({
           name: guard.name.trim(),
+          team: guard.team?.trim() || '',
           periodId: newPeriod.id,
           totalHours: 0
         }));

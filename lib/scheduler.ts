@@ -171,6 +171,28 @@ export async function assignGuardsToShifts(
     }
   });
 
+  // Fetch all morning readiness shifts once to optimize lookups
+  const allMorningReadinessShifts = await prisma.shift.findMany({
+    where: {
+      periodId,
+      isSpecial: true,
+      specialType: 'morning_readiness',
+      guardId: { not: null }
+    },
+    select: { guardId: true, startTime: true }
+  });
+
+  // Create in-memory map of guard hours for efficient updates
+  const guardHoursMap = new Map<string, number>();
+  allGuards.forEach(guard => guardHoursMap.set(guard.id, guard.totalHours));
+
+  // Create team map for efficient team-based lookups
+  const guardTeamMap = new Map<string, string>();
+  allGuards.forEach(guard => guardTeamMap.set(guard.id, guard.team || ''));
+
+  // Collect all assignments first (in-memory)
+  const shiftAssignments: Array<{ shiftId: string; guardId: string; duration: number }> = [];
+
   let assignedInCurrentRound = 0;
   let roundOffset = 0; // Used to rotate guard selection each round
 
@@ -199,24 +221,17 @@ export async function assignGuardsToShifts(
     const extendsAfterMorningReadiness = shiftEndTimeInMinutes > morningReadinessEnd;
 
     if (extendsAfterMorningReadiness) {
-      // Find guards who have morning readiness on this day and exclude them
+      // Find guards who have morning readiness on this day (use in-memory data)
       const shiftDate = new Date(shift.startTime);
       shiftDate.setHours(0, 0, 0, 0);
       const nextDay = new Date(shiftDate);
       nextDay.setDate(nextDay.getDate() + 1);
 
-      const morningReadinessShifts = await prisma.shift.findMany({
-        where: {
-          periodId,
-          startTime: { gte: shiftDate, lt: nextDay },
-          isSpecial: true,
-          specialType: 'morning_readiness',
-          guardId: { not: null }
-        },
-        select: { guardId: true }
-      });
-
-      const morningReadinessGuardIds = morningReadinessShifts
+      const morningReadinessGuardIds = allMorningReadinessShifts
+        .filter(mrs => {
+          const mrsStart = new Date(mrs.startTime);
+          return mrsStart >= shiftDate && mrsStart < nextDay;
+        })
         .map(s => s.guardId)
         .filter((id): id is string => id !== null);
 
@@ -224,7 +239,42 @@ export async function assignGuardsToShifts(
       busyGuardIds.push(...morningReadinessGuardIds);
     }
 
-    const guardId = await getNextAvailableGuard(periodId, busyGuardIds);
+    // For 2-person shifts, try to pair guards from the same team
+    let guardId: string | null = null;
+
+    if (shift.peopleCount === 2) {
+      // Check if there's already a guard assigned to this exact time slot and post
+      const existingGuardAtThisShift = allAssignedShifts.find(
+        s => s.startTime.getTime() === shift.startTime.getTime() &&
+             s.startTime.getTime() === shift.startTime.getTime() &&
+             !busyGuardIds.includes(s.guardId!)
+      );
+
+      if (existingGuardAtThisShift && existingGuardAtThisShift.guardId) {
+        // Try to find a guard from the same team
+        const existingGuardTeam = guardTeamMap.get(existingGuardAtThisShift.guardId);
+
+        if (existingGuardTeam) {
+          // Find guards from same team who are available
+          const availableTeammates = allGuards
+            .filter(g =>
+              g.team === existingGuardTeam &&
+              g.id !== existingGuardAtThisShift.guardId &&
+              !busyGuardIds.includes(g.id)
+            )
+            .sort((a, b) => a.totalHours - b.totalHours);
+
+          if (availableTeammates.length > 0) {
+            guardId = availableTeammates[0].id;
+          }
+        }
+      }
+    }
+
+    // If no team match found or not a 2-person shift, use regular assignment
+    if (!guardId) {
+      guardId = await getNextAvailableGuard(periodId, busyGuardIds);
+    }
 
     if (!guardId) {
       console.warn(`No available guard for shift at ${shift.startTime}`);
@@ -233,21 +283,12 @@ export async function assignGuardsToShifts(
 
     const shiftDuration = (shift.endTime.getTime() - shift.startTime.getTime()) / (1000 * 60 * 60);
 
-    // Assign guard and update their total hours
-    await prisma.$transaction([
-      prisma.shift.update({
-        where: { id: shift.id },
-        data: { guardId }
-      }),
-      prisma.guard.update({
-        where: { id: guardId },
-        data: {
-          totalHours: {
-            increment: shiftDuration
-          }
-        }
-      })
-    ]);
+    // Collect assignment (don't update DB yet)
+    shiftAssignments.push({
+      shiftId: shift.id,
+      guardId,
+      duration: shiftDuration
+    });
 
     // Update in-memory cache for overlap detection
     allAssignedShifts.push({
@@ -256,6 +297,10 @@ export async function assignGuardsToShifts(
       endTime: shift.endTime
     });
 
+    // Update in-memory guard hours
+    const currentHours = guardHoursMap.get(guardId) || 0;
+    guardHoursMap.set(guardId, currentHours + shiftDuration);
+
     // Track rounds: when all guards have been assigned once, start new round with rotation
     assignedInCurrentRound++;
     if (assignedInCurrentRound >= allGuards.length) {
@@ -263,6 +308,37 @@ export async function assignGuardsToShifts(
       roundOffset++; // This will cause getNextAvailableGuard to pick differently next round
     }
   }
+
+  // Now bulk update all shifts and guards in batches
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < shiftAssignments.length; i += BATCH_SIZE) {
+    const batch = shiftAssignments.slice(i, i + BATCH_SIZE);
+
+    await prisma.$transaction(async (tx) => {
+      // Update shifts in batch
+      for (const assignment of batch) {
+        await tx.shift.update({
+          where: { id: assignment.shiftId },
+          data: { guardId: assignment.guardId }
+        });
+      }
+    });
+  }
+
+  // Update guard total hours in one batch
+  const guardHoursUpdates = Array.from(guardHoursMap.entries()).map(([guardId, totalHours]) => ({
+    guardId,
+    totalHours
+  }));
+
+  await prisma.$transaction(async (tx) => {
+    for (const update of guardHoursUpdates) {
+      await tx.guard.update({
+        where: { id: update.guardId },
+        data: { totalHours: update.totalHours }
+      });
+    }
+  });
 }
 
 /**
