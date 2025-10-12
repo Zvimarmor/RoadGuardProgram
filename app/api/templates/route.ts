@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(template, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving template:', error);
 
     // Handle unique constraint violation
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: 'A template with this name already exists' },
         { status: 400 }

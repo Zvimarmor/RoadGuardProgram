@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { addHours, addMinutes, format, isWithinInterval, setHours, setMinutes } from 'date-fns';
+import { addHours, isWithinInterval } from 'date-fns';
 
 interface ShiftConfig {
   startHour: number;
@@ -194,7 +194,6 @@ export async function assignGuardsToShifts(
   const shiftAssignments: Array<{ shiftId: string; guardId: string; duration: number }> = [];
 
   let assignedInCurrentRound = 0;
-  let roundOffset = 0; // Used to rotate guard selection each round
 
   for (const shift of unassignedShifts) {
     // Find guards who are NOT already assigned to an overlapping shift
@@ -305,40 +304,38 @@ export async function assignGuardsToShifts(
     assignedInCurrentRound++;
     if (assignedInCurrentRound >= allGuards.length) {
       assignedInCurrentRound = 0;
-      roundOffset++; // This will cause getNextAvailableGuard to pick differently next round
     }
   }
 
-  // Now bulk update all shifts and guards in batches
-  const BATCH_SIZE = 100;
+  // Batch updates with controlled concurrency to avoid overwhelming the database
+  const BATCH_SIZE = 50;
+
+  // Update shifts in batches
   for (let i = 0; i < shiftAssignments.length; i += BATCH_SIZE) {
     const batch = shiftAssignments.slice(i, i + BATCH_SIZE);
-
-    await prisma.$transaction(async (tx) => {
-      // Update shifts in batch
-      for (const assignment of batch) {
-        await tx.shift.update({
+    await Promise.all(
+      batch.map(assignment =>
+        prisma.shift.update({
           where: { id: assignment.shiftId },
           data: { guardId: assignment.guardId }
-        });
-      }
-    });
+        })
+      )
+    );
   }
 
-  // Update guard total hours in one batch
-  const guardHoursUpdates = Array.from(guardHoursMap.entries()).map(([guardId, totalHours]) => ({
-    guardId,
-    totalHours
-  }));
-
-  await prisma.$transaction(async (tx) => {
-    for (const update of guardHoursUpdates) {
-      await tx.guard.update({
-        where: { id: update.guardId },
-        data: { totalHours: update.totalHours }
-      });
-    }
-  });
+  // Update guard total hours in batches
+  const guardUpdates = Array.from(guardHoursMap.entries());
+  for (let i = 0; i < guardUpdates.length; i += BATCH_SIZE) {
+    const batch = guardUpdates.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(([guardId, totalHours]) =>
+        prisma.guard.update({
+          where: { id: guardId },
+          data: { totalHours: totalHours }
+        })
+      )
+    );
+  }
 }
 
 /**

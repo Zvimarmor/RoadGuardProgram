@@ -30,6 +30,7 @@ export default function AllShifts() {
 
   useEffect(() => {
     applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shifts, filterDate, filterPost]);
 
   const fetchAllShifts = async () => {
@@ -169,7 +170,7 @@ export default function AllShifts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredShifts.map((shift, index) => (
+                  {filteredShifts.map((shift) => (
                     <tr
                       key={shift.id}
                       className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors bg-transparent"

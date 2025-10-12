@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, startOfDay, endOfDay } from 'date-fns';
-import { he } from 'date-fns/locale';
 
 interface Guard {
   id: string;
@@ -607,7 +605,7 @@ export default function Admin() {
                     value={guardsText}
                     onChange={(e) => setGuardsText(e.target.value)}
                     rows={8}
-                    placeholder={`דוגמה:\nדני, אלפא\nמשה, אלפא\nיוסי, ברבו\nאבי, ברבו`}
+                    placeholder={`דוגמה:\nדני, גליק\nמשה, גליק\nיוסי, ישי\nאבי, ישי`}
                     className="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-950 placeholder-neutral-400 dark:placeholder-neutral-600 focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-100 focus:border-transparent outline-none font-mono text-sm resize-none"
                   />
                   <div className="flex items-center gap-2 mt-2">
